@@ -43,7 +43,7 @@ an un-fetched git-lfs pointer; run `git lfs pull` to fix that.
 from vbfnet_ensemble import VBFNet  # alias of VBFNetEnsemble
 
 net = VBFNet(use_quantile_calibration=True)  # loads and verifies the 5 bundled members
-out = net.predict_root("signal.root", tree_name="Events")
+out = net.predict_root("signal.root", tree_name="Events", max_events=100)
 
 out["pred_phys"]["q1_E"]["point"]  # central value per event (GeV)
 out["pred_phys_cal"]["q1_E"]["q84"]  # calibrated 84 % quantile
@@ -86,7 +86,7 @@ map, i.e. the names of the training files. If your names differ:
 3. Pass the map when you predict:
 
    ```python
-   out = net.predict_root("your.root", branch_map="my_branch_map.yaml")   # or a dict
+   out = net.predict_root("your.root", branch_map="my_branch_map.yaml")  # or a dict
    ```
 
    The scripts take `--branch_map my_branch_map.yaml`, and the BDT example also takes
