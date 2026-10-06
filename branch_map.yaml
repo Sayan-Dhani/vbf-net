@@ -1,0 +1,81 @@
+# VBF-Net input branch map
+#
+#   left  (key)   : the branch name the model expects. Never change the left side.
+#   right (value) : the branch in YOUR tree that holds that quantity.
+#
+# This template is the identity map: the names in the files the model was
+# trained on. If your tree uses other names, copy this file, edit the right-hand
+# side, and pass it on:
+#
+#   Python : net.predict_root("file.root", branch_map="my_branch_map.yaml")
+#   scripts: --branch_map my_branch_map.yaml
+#            (run_infer_ensemble.py, check_branch_map.py, example_bdt_input/make_bdt_inputs.py)
+#
+# Check a map against your file first:
+#   python3 scripts/check_branch_map.py --root_file your.root --branch_map my_branch_map.yaml
+#
+# A map only RENAMES branches. It cannot convert units, recompute variables or
+# select objects. Map each name to a branch with the SAME meaning:
+#   - the same objects: the VBF-jet candidates, the two H->bb candidate jets
+#     (b1, b2) and the two H->tautau visible legs (tau1, tau2);
+#   - the same algorithm: the four b-tag inputs are DeepJet (DeepFlav) scores;
+#   - the same units and conventions: GeV, phi in radians.
+# A branch with a different meaning gives wrong predictions without any error.
+#
+# What each left-hand name means (objects, per event or per jet, units):
+#   README.md, section "What each branch in the map means".
+#
+# Entries you leave out, or map to themselves, are read under the left-hand name.
+# The right-hand side must be an existing branch name (no expressions).
+
+branch_map:
+
+  # ── Event id (required): each event is predicted by member event % 5 ─────────
+  run: run
+  luminosityBlock: luminosityBlock
+  event: event
+
+  # ── VBF-jet candidates (required). One value per jet, plus the jet count ─────
+  nVBFJet: nVBFJet
+  VBFJet_pt: VBFJet_pt
+  VBFJet_eta: VBFJet_eta
+  VBFJet_phi: VBFJet_phi
+  VBFJet_mass: VBFJet_mass
+  VBFJet_btagDeepFlavB: VBFJet_btagDeepFlavB
+  VBFJet_btagDeepFlavCvB: VBFJet_btagDeepFlavCvB
+  VBFJet_btagDeepFlavCvL: VBFJet_btagDeepFlavCvL
+  VBFJet_btagDeepFlavQG: VBFJet_btagDeepFlavQG
+  VBFJet_nConstituents: VBFJet_nConstituents
+
+  # ── H->bb candidate jets (required). One value per event ─────────────────────
+  b1_pt: b1_pt
+  b1_eta: b1_eta
+  b1_phi: b1_phi
+  b1_mass: b1_mass
+  b2_pt: b2_pt
+  b2_eta: b2_eta
+  b2_phi: b2_phi
+  b2_mass: b2_mass
+
+  # ── H->tautau visible legs (required). One value per event ───────────────────
+  tau1_pt: tau1_pt
+  tau1_eta: tau1_eta
+  tau1_phi: tau1_phi
+  tau1_mass: tau1_mass
+  tau2_pt: tau2_pt
+  tau2_eta: tau2_eta
+  tau2_phi: tau2_phi
+  tau2_mass: tau2_mass
+
+  # ── Missing transverse momentum (required). One value per event ──────────────
+  met_pt: met_pt
+  met_phi: met_phi
+
+  # ── Generator level: needed ONLY with require_truth=True ─────────────────────
+  # (comparing predictions with the true quarks on simulation). Not read otherwise.
+  nLHEPart: nLHEPart
+  LHEPart_pt: LHEPart_pt
+  LHEPart_eta: LHEPart_eta
+  LHEPart_phi: LHEPart_phi
+  LHEPart_mass: LHEPart_mass
+  Hbb_isValid: Hbb_isValid

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vbfnet-ensemble"
+version = "4.0.0+hl"
+description = "Fold-routed k-fold VBF-Net GNN regressors (member = event % K) for the HH->bbtautau VBF observables mjj, deta, eta_prod and ptsum"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24",
+    "torch>=2.0",
+    "torch-geometric>=2.4",
+    "uproot>=5.0",
+    "awkward>=2.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+calibration = ["correctionlib>=2.0"]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools]
+packages = ["vbfnet_ensemble"]
+
+[tool.setuptools.package-data]
+vbfnet_ensemble = ["py.typed"]

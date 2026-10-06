@@ -1,0 +1,176 @@
+{
+  "schema_version": 2,
+  "corrections": [
+    {
+      "name": "eta_prod_local_shift_q16",
+      "description": "Local eta_prod q16 calibration. Input is raw q50 in physical space (dimensionless); output is additive shift to q16 in physical space (dimensionless).",
+      "version": 1,
+      "inputs": [
+        {
+          "name": "raw_q50",
+          "type": "real",
+          "description": "Raw predicted q50 in physical space (dimensionless)"
+        }
+      ],
+      "output": {
+        "name": "delta_q16",
+        "type": "real",
+        "description": "Additive correction for q16 (dimensionless)"
+      },
+      "data": {
+        "nodetype": "binning",
+        "input": "raw_q50",
+        "edges": [
+          -18.96575927734375,
+          -17.234694067637125,
+          -15.5036288579305,
+          -13.772563648223876,
+          -12.041498438517252,
+          -10.310433228810629,
+          -8.579368019104004,
+          -6.84830280939738,
+          -5.117237599690755,
+          -3.3861723899841305,
+          -1.6551071802775077,
+          0.07595802942911689,
+          1.8070232391357415,
+          3.538088448842366,
+          5.269153658548991,
+          7.000218868255615
+        ],
+        "content": [
+          -0.014941024780273445,
+          0.07821311950683596,
+          0.05917232513427735,
+          0.060206298828125004,
+          0.05622558593750002,
+          0.027957115173339844,
+          0.0034341239929199206,
+          -0.010052795410156247,
+          -0.0072029685974120995,
+          -0.014301815032958985,
+          -0.035628317594528204,
+          -0.11212731838226318,
+          -0.2557903480529785,
+          -0.7282894754409791,
+          0.002803096771240429
+        ],
+        "flow": "clamp"
+      }
+    },
+    {
+      "name": "eta_prod_local_shift_q50",
+      "description": "Local eta_prod q50 calibration. Input is raw q50 in physical space (dimensionless); output is additive shift to q50 in physical space (dimensionless).",
+      "version": 1,
+      "inputs": [
+        {
+          "name": "raw_q50",
+          "type": "real",
+          "description": "Raw predicted q50 in physical space (dimensionless)"
+        }
+      ],
+      "output": {
+        "name": "delta_q50",
+        "type": "real",
+        "description": "Additive correction for q50 (dimensionless)"
+      },
+      "data": {
+        "nodetype": "binning",
+        "input": "raw_q50",
+        "edges": [
+          -18.96575927734375,
+          -17.234694067637125,
+          -15.5036288579305,
+          -13.772563648223876,
+          -12.041498438517252,
+          -10.310433228810629,
+          -8.579368019104004,
+          -6.84830280939738,
+          -5.117237599690755,
+          -3.3861723899841305,
+          -1.6551071802775077,
+          0.07595802942911689,
+          1.8070232391357415,
+          3.538088448842366,
+          5.269153658548991,
+          7.000218868255615
+        ],
+        "content": [
+          -0.2627735137939453,
+          -0.08375835418701172,
+          -0.046845436096191406,
+          -0.032935142517089844,
+          -0.035368919372558594,
+          -0.050937652587890625,
+          -0.054883480072021484,
+          -0.04073333740234375,
+          -0.018639683723449707,
+          -0.009096384048461914,
+          -0.008069515228271484,
+          -0.03399580717086792,
+          -0.1432499885559082,
+          -0.25823235511779785,
+          0.08707284927368164
+        ],
+        "flow": "clamp"
+      }
+    },
+    {
+      "name": "eta_prod_local_shift_q84",
+      "description": "Local eta_prod q84 calibration. Input is raw q50 in physical space (dimensionless); output is additive shift to q84 in physical space (dimensionless).",
+      "version": 1,
+      "inputs": [
+        {
+          "name": "raw_q50",
+          "type": "real",
+          "description": "Raw predicted q50 in physical space (dimensionless)"
+        }
+      ],
+      "output": {
+        "name": "delta_q84",
+        "type": "real",
+        "description": "Additive correction for q84 (dimensionless)"
+      },
+      "data": {
+        "nodetype": "binning",
+        "input": "raw_q50",
+        "edges": [
+          -18.96575927734375,
+          -17.234694067637125,
+          -15.5036288579305,
+          -13.772563648223876,
+          -12.041498438517252,
+          -10.310433228810629,
+          -8.579368019104004,
+          -6.84830280939738,
+          -5.117237599690755,
+          -3.3861723899841305,
+          -1.6551071802775077,
+          0.07595802942911689,
+          1.8070232391357415,
+          3.538088448842366,
+          5.269153658548991,
+          7.000218868255615
+        ],
+        "content": [
+          -0.23248519897460942,
+          -0.18939914703369143,
+          -0.08982055664062502,
+          -0.041947326660156235,
+          -0.029237976074218748,
+          -0.02412925720214857,
+          -0.025429096221923783,
+          -0.015269451141357575,
+          -0.004241371154785165,
+          -0.011882061958313121,
+          -0.02171667098999039,
+          -0.036440635919570946,
+          -0.18434136390686034,
+          -0.38013026237487796,
+          0.1198709487915038
+        ],
+        "flow": "clamp"
+      }
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Maintainer-only files: kept locally, not part of the published release
+CHANGELOG.md
+PROVENANCE.txt
+maintainer/
+tests/
+pytest.ini
+requirements-dev.txt
+.github/
+.githooks/
+git_repo_commands.md
+
+# Data and analysis artifacts — never committed
+*.root
+*.npz
+*.npy
+*.csv
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.h5
+*.hdf5
+*.pkl
+*.parquet
+*.log
+reports/
+eval_out/
+bdt_inputs*/
+
+# Checkpoints are shipped via git-lfs from models/ ONLY.
+# The blanket ignore protects against a stray checkpoint elsewhere in the tree;
+# the negation keeps the release itself tracked. Without the negation this rule
+# would silently exclude the very weights this package exists to distribute.
+*.pt
+*.pth
+*.ckpt
+*.onnx
+!models/*.pt
+
+# Set-aside directories left by the maintainer's release tools (--force)
+models.bak.*/
+calibrations.bak.*/
+
+# Credentials — never, anywhere
+x509up*
+*.Xauthority
+.Xauthority
+krb5cc*
+*.pem
+*.key
+.netrc
+
+# EOS version-history / atomic-upload entries
+.sys.v#.*
+.sys.a#.*
+
+# Environments, editors, OS
+.ipynb_checkpoints/
+.venv/
+venv/
+.vscode/
+.idea/
+.claude/
+*.swp
+*~
+.DS_Store

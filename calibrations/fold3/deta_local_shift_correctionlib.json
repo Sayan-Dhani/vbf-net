@@ -1,0 +1,176 @@
+{
+  "schema_version": 2,
+  "corrections": [
+    {
+      "name": "deta_local_shift_q16",
+      "description": "Local deta q16 calibration. Input is raw q50 in physical space (dimensionless); output is additive shift to q16 in physical space (dimensionless).",
+      "version": 1,
+      "inputs": [
+        {
+          "name": "raw_q50",
+          "type": "real",
+          "description": "Raw predicted q50 in physical space (dimensionless)"
+        }
+      ],
+      "output": {
+        "name": "delta_q16",
+        "type": "real",
+        "description": "Additive correction for q16 (dimensionless)"
+      },
+      "data": {
+        "nodetype": "binning",
+        "input": "raw_q50",
+        "edges": [
+          -0.0403696745634079,
+          0.56046794851621,
+          1.1613055715958278,
+          1.7621431946754456,
+          2.3629808177550635,
+          2.9638184408346815,
+          3.564656063914299,
+          4.165493686993917,
+          4.766331310073535,
+          5.3671689331531525,
+          5.968006556232771,
+          6.568844179312388,
+          7.169681802392006,
+          7.770519425471624,
+          8.371357048551243,
+          8.97219467163086
+        ],
+        "content": [
+          0.028222775757312774,
+          0.04097758531570434,
+          0.031151843070983887,
+          0.03597326755523683,
+          0.037624406814575205,
+          0.038520593643188474,
+          0.04312050819396974,
+          0.044781036376953104,
+          0.035055732727050794,
+          0.020810604095458988,
+          0.00032463073730469236,
+          -0.025133571624755862,
+          -0.04108022689819336,
+          -0.06907089233398438,
+          0.02116260528564454
+        ],
+        "flow": "clamp"
+      }
+    },
+    {
+      "name": "deta_local_shift_q50",
+      "description": "Local deta q50 calibration. Input is raw q50 in physical space (dimensionless); output is additive shift to q50 in physical space (dimensionless).",
+      "version": 1,
+      "inputs": [
+        {
+          "name": "raw_q50",
+          "type": "real",
+          "description": "Raw predicted q50 in physical space (dimensionless)"
+        }
+      ],
+      "output": {
+        "name": "delta_q50",
+        "type": "real",
+        "description": "Additive correction for q50 (dimensionless)"
+      },
+      "data": {
+        "nodetype": "binning",
+        "input": "raw_q50",
+        "edges": [
+          -0.0403696745634079,
+          0.56046794851621,
+          1.1613055715958278,
+          1.7621431946754456,
+          2.3629808177550635,
+          2.9638184408346815,
+          3.564656063914299,
+          4.165493686993917,
+          4.766331310073535,
+          5.3671689331531525,
+          5.968006556232771,
+          6.568844179312388,
+          7.169681802392006,
+          7.770519425471624,
+          8.371357048551243,
+          8.97219467163086
+        ],
+        "content": [
+          0.03744160383939743,
+          0.05057710409164429,
+          0.018900752067565918,
+          0.022098541259765625,
+          0.031412363052368164,
+          0.03374838829040527,
+          0.035396575927734375,
+          0.033930301666259766,
+          0.03196239471435547,
+          0.02665233612060547,
+          0.013467788696289062,
+          -0.01179361343383789,
+          -0.026014328002929688,
+          0.009286880493164062,
+          0.0036993026733398438
+        ],
+        "flow": "clamp"
+      }
+    },
+    {
+      "name": "deta_local_shift_q84",
+      "description": "Local deta q84 calibration. Input is raw q50 in physical space (dimensionless); output is additive shift to q84 in physical space (dimensionless).",
+      "version": 1,
+      "inputs": [
+        {
+          "name": "raw_q50",
+          "type": "real",
+          "description": "Raw predicted q50 in physical space (dimensionless)"
+        }
+      ],
+      "output": {
+        "name": "delta_q84",
+        "type": "real",
+        "description": "Additive correction for q84 (dimensionless)"
+      },
+      "data": {
+        "nodetype": "binning",
+        "input": "raw_q50",
+        "edges": [
+          -0.0403696745634079,
+          0.56046794851621,
+          1.1613055715958278,
+          1.7621431946754456,
+          2.3629808177550635,
+          2.9638184408346815,
+          3.564656063914299,
+          4.165493686993917,
+          4.766331310073535,
+          5.3671689331531525,
+          5.968006556232771,
+          6.568844179312388,
+          7.169681802392006,
+          7.770519425471624,
+          8.371357048551243,
+          8.97219467163086
+        ],
+        "content": [
+          0.11455698251724222,
+          0.15469245910644527,
+          0.03449873924255371,
+          0.03184391975402828,
+          0.03287793159484863,
+          0.031353836059570296,
+          0.028507728576660153,
+          0.028881988525390617,
+          0.026350822448730438,
+          0.018772354125976463,
+          0.0003156661987303751,
+          -0.02221691131591797,
+          -0.026769371032714928,
+          -0.004352912902832032,
+          0.014639472961425783
+        ],
+        "flow": "clamp"
+      }
+    }
+  ]
+}
