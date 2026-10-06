@@ -1,0 +1,121 @@
+# Configuration for example_bdt_input/make_bdt_inputs.py
+#
+# Precedence: script defaults  <  this file  <  command-line flags.
+# Relative paths are resolved from the directory you RUN the script in
+# (normally the repository root).
+
+bdt_inputs:
+
+  inputs:
+    # One signal and one background ROOT file with an `Events` TTree containing
+    # the VBFJet_*, Hbb/Htt and MET branches the model reads (see
+    # vbfnet_ensemble/pyg_vbf_dataset.py, _FEATURE_BRANCHES).
+    # Set both here, or pass --signal / --background on the command line.
+    signal: null                   # e.g. /path/to/signal.root
+    background: null               # e.g. /path/to/background.root
+    tree_name: Events
+
+    # Files whose branches have other names: a YAML branch map laid out like
+    # ../branch_map.yaml (left: the model's name, right: your branch), or an
+    # inline {logical: actual} mapping. Applied to the GNN inputs AND the
+    # classical selection. null = the model's own names.
+    branch_map: null
+
+    # Events per file. Counted AFTER the acceptance gate below drops events, so `max_events: 10000` gives exactly 10000 rows per tree (if the
+    # file has that many). null = the whole file. Speed on a T4 GPU is about
+    # 90 events/s, so 10000 per file takes ~4 min.
+    max_events: 50000
+    signal_max_events: null        # overrides max_events for the signal only
+    background_max_events: null    # overrides max_events for the background only
+
+  # Deployment gate (reco only, no truth cuts): an event gets a GNN prediction,
+  # and a row, only if it has at least `min_jets` VBF jets with
+  # pT >= jet_min_pt [GeV] and |eta| <= jet_max_abs_eta. A gate only: the graph
+  # is still built from ALL of the event's jets, exactly as in training.
+  acceptance:
+    min_jets: 2
+    jet_min_pt: 50.0
+    jet_max_abs_eta: 4.7
+
+  runtime:
+    batch_size: 512
+    num_workers: 4                 # DataLoader workers for the GNN (0 = main process)
+    device: null                   # null = cuda if available, else cpu
+
+  model:
+    # Directory holding the member checkpoints (member_fold*.pt), one per fold.
+    # null = the bundled release in VBFNet_Ensemble/models/. Every event is
+    # predicted by member event % 5, so all five folds are required.
+    checkpoint: null
+
+    # Per-member quantile calibration (calibrations/fold{k}/).
+    # null = the bundled release in VBFNet_Ensemble/calibrations/.
+    calibration_dir: null
+
+    # ON : the *_gnn_q{16,50,84}_cal branches hold calibrated quantiles.
+    # OFF: they hold a copy of the *_raw branches (as the old script did).
+    # The *_gnn_point branches are identical either way.
+    use_quantile_calibration: true
+
+  old_selection:
+    # Classical reco-level VBF-pair baseline (no ML, no truth matching):
+    # among pT-sorted VBFJets, take the pair with the largest mjj that has
+    # |deta| > deta_cut; the event passes if that mjj > mjj_cut.
+    deta_cut: 3.0
+    mjj_cut: 50.0                  # GeV
+    branches:                      # input branches it reads
+      - nVBFJet
+      - VBFJet_pt
+      - VBFJet_eta
+      - VBFJet_phi
+      - VBFJet_mass
+    outputs:                       # quantity -> output branch name
+      mjj: mjj_old
+      deta: deta_old
+      eta_prod: eta_prod_old
+      ptsum: pt_sum_old
+      pass: old_pass               # int: 1 = event passed, 0 = failed (other *_old = fill_value)
+      # Four-vector of the selected pair; q1 = the more forward jet (higher eta),
+      # the same ordering as the truth quarks the GNN regresses.
+      q1_E: q1_E_old
+      q1_px: q1_px_old
+      q1_py: q1_py_old
+      q1_pz: q1_pz_old
+      q2_E: q2_E_old
+      q2_px: q2_px_old
+      q2_py: q2_py_old
+      q2_pz: q2_pz_old
+
+  targets:
+    # Observables DERIVED from the regressed q1/q2 four-vectors (point head),
+    # written as <branch_prefix>_gnn_point.
+    #   key          : which observable (one of mjj, deta, eta_prod, ptsum)
+    #   vbfnet_key   : kept for compatibility with the old config; unused
+    #   branch_prefix: prefix of the output branch
+    - {key: mjj,      vbfnet_key: mjj,      branch_prefix: mjj}
+    - {key: deta,     vbfnet_key: deta,     branch_prefix: deta}
+    - {key: eta_prod, vbfnet_key: eta_prod, branch_prefix: eta_prod}
+    - {key: ptsum,    vbfnet_key: ptsum,    branch_prefix: pt_sum}
+
+  outputs:
+    outdir: bdt_inputs_ensemble
+    fill_value: -999.0             # replaces NaN/inf (e.g. *_old of failed events)
+    tree_names:
+      signal: sig
+      background: bkg
+    old_filename: bdt_inputs_old_selection.root
+    gnn_filename: bdt_inputs_gnn.root
+    combined_filename: bdt_inputs_combined.root
+    provenance_filename: bdt_inputs_provenance.json
+
+    # Which branches go into the old-only and gnn-only files (prefix match).
+    # These lists REPLACE the script defaults, they are not merged.
+    # The script checks the final branch set against the fixed 79-branch
+    # contract (v2: the old 75 + run, luminosityBlock, event, gnn_fold) and
+    # refuses to write anything else. The 6 bookkeeping branches go in every file.
+    old_prefixes: [mjj_old, deta_old, eta_prod_old, pt_sum_old, old_pass,
+                   q1_E_old, q1_px_old, q1_py_old, q1_pz_old,
+                   q2_E_old, q2_px_old, q2_py_old, q2_pz_old]
+    gnn_prefixes: [mjj_gnn, deta_gnn, eta_prod_gnn, pt_sum_gnn,
+                   q1_E_gnn, q1_px_gnn, q1_py_gnn, q1_pz_gnn,
+                   q2_E_gnn, q2_px_gnn, q2_py_gnn, q2_pz_gnn]

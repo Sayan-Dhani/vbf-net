@@ -1,0 +1,13 @@
+# Runtime dependencies for vbfnet_ensemble.
+#
+# NOT listed, deliberately:
+#   correctionlib  - only needed to APPLY the shipped quantile calibration
+#                    (pip install -e ".[calibration]"). It is imported lazily,
+#                    so the package imports without it.
+#   ROOT / PyROOT  - not required. Graph building here goes through uproot.
+numpy>=1.24
+torch>=2.0
+torch-geometric>=2.4
+uproot>=5.0
+awkward>=2.0
+PyYAML>=6.0
