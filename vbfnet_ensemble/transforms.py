@@ -30,6 +30,20 @@ LEGACY_TARGET_SPECS = [
 ]
 DEFAULT_QUANTILES = [0.16, 0.50, 0.84]
 
+#: The quark four-vector components the p4 set regresses.
+P4_TARGET_KEYS = ["q1_E", "q1_px", "q1_py", "q1_pz", "q2_E", "q2_px", "q2_py", "q2_pz"]
+
+#: Suffix of the di-quark observables DERIVED from the p4 heads. The plain names
+#: (mjj, deta, eta_prod, ptsum) belong to the set that REGRESSES them (hl), so a
+#: plain ``mjj`` never changes meaning with which sets are loaded.
+P4_DERIVED_SUFFIX = "_p4"
+
+#: Everything :func:`_derive_vbf_observables_from_p4` adds, in output order.
+P4_DERIVED_KEYS = [
+    "q1_pt", "q1_eta", "q1_phi", "q1_mass",
+    "q2_pt", "q2_eta", "q2_phi", "q2_mass",
+] + [f"{k}{P4_DERIVED_SUFFIX}" for k in LEGACY_TARGETS]
+
 
 def _quantile_name(q: float) -> str:
     return f"q{int(round(100.0 * float(q)))}"
@@ -260,13 +274,16 @@ def _derive_vbf_observables_from_p4(out: dict[str, dict[str, np.ndarray]]) -> No
     Two families are produced from the (E, px, py, pz) heads of each jet:
 
       * per-jet cylindrical:  q1_pt/q1_eta/q1_phi/q1_mass (and q2_*),
-      * di-jet high-level:    mjj, deta, eta_prod, ptsum.
+      * di-jet high-level:    mjj_p4, deta_p4, eta_prod_p4, ptsum_p4.
+
+    The di-jet names carry :data:`P4_DERIVED_SUFFIX` because the plain names are
+    the hl set's REGRESSED observables.
 
     These derived q16/q50/q84 values are transforms of component-wise p4 heads.
     They are useful BDT inputs, but they are not guaranteed calibrated quantiles of
     the derived observable unless calibrated separately at observable level.
     """
-    p4_keys = ["q1_E", "q1_px", "q1_py", "q1_pz", "q2_E", "q2_px", "q2_py", "q2_pz"]
+    p4_keys = P4_TARGET_KEYS
     if not all(k in out for k in p4_keys):
         return
 
@@ -277,13 +294,9 @@ def _derive_vbf_observables_from_p4(out: dict[str, dict[str, np.ndarray]]) -> No
     if not common_heads:
         return
 
-    derived_keys = [
-        "q1_pt", "q1_eta", "q1_phi", "q1_mass",
-        "q2_pt", "q2_eta", "q2_phi", "q2_mass",
-        "mjj", "deta", "eta_prod", "ptsum",
-    ]
-    for target in derived_keys:
+    for target in P4_DERIVED_KEYS:
         out.setdefault(target, {})
+    s = P4_DERIVED_SUFFIX
 
     for head in sorted(common_heads):
         E1 = np.asarray(out["q1_E"][head], dtype=np.float64)
@@ -312,16 +325,16 @@ def _derive_vbf_observables_from_p4(out: dict[str, dict[str, np.ndarray]]) -> No
         out["q2_phi"][head] = _phi_from_px_py(px2, py2)
         out["q2_mass"][head] = _mass_from_p4(E2, px2, py2, pz2)
 
-        # ── di-jet high-level (mjj, deta, eta_prod, ptsum) ────────────────────
+        # ── di-jet high-level (mjj_p4, deta_p4, eta_prod_p4, ptsum_p4) ────────
         E = E1 + E2
         px = px1 + px2
         py = py1 + py2
         pz = pz1 + pz2
 
-        out["mjj"][head] = _mass_from_p4(E, px, py, pz)
-        out["deta"][head] = np.abs(eta1 - eta2)
-        out["eta_prod"][head] = eta1 * eta2
-        out["ptsum"][head] = pt1 + pt2
+        out[f"mjj{s}"][head] = _mass_from_p4(E, px, py, pz)
+        out[f"deta{s}"][head] = np.abs(eta1 - eta2)
+        out[f"eta_prod{s}"][head] = eta1 * eta2
+        out[f"ptsum{s}"][head] = pt1 + pt2
 
 
 def predictions_array_to_dict(

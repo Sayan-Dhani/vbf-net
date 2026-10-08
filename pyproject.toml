@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vbfnet-ensemble"
-version = "4.0.0"
-description = "Fold-routed k-fold VBF-Net GNN regressors (member = event % K) for HH->bbtautau VBF quark four-vector reconstruction"
+version = "5.0.0"
+description = "Fold-routed k-fold VBF-Net GNN regressors (member = event % K) for HH->bbtautau VBF: quark four-vectors (p4) and mjj, deta, eta_prod, ptsum (hl)"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [

@@ -1,5 +1,6 @@
-# Configuration for example_bdt_input/make_bdt_inputs.py -- HL release
-# (members regress mjj, deta, eta_prod, ptsum directly; model.target_set: hl).
+# Configuration for example_bdt_input/make_bdt_inputs.py.
+# Runs both model sets (model.target_set: both): p4 regresses the quark
+# four-vectors, hl regresses mjj, deta, eta_prod, ptsum directly.
 #
 # Precedence: script defaults  <  this file  <  command-line flags.
 # Relative paths are resolved from the directory you RUN the script in
@@ -44,13 +45,14 @@ bdt_inputs:
     device: null                   # null = cuda if available, else cpu
 
   model:
-    # Directory holding the member checkpoints (member_fold*.pt), one per fold.
-    # null = the bundled release in VBFNet_Ensemble/models/. Every event is
+    # Directory holding the member checkpoints (member_fold*.pt), one per fold,
+    # replacing the members of ONE set (needs target_set p4 or hl).
+    # null = the bundled set in ensembles/<set>/models/. Every event is
     # predicted by member event % 5, so all five folds are required.
     checkpoint: null
 
-    # Per-member quantile calibration (calibrations/fold{k}/).
-    # null = the bundled release in VBFNet_Ensemble/calibrations/.
+    # Per-member quantile calibration (calibrations/fold{k}/) for that set.
+    # null = the bundled one in ensembles/<set>/calibrations/.
     calibration_dir: null
 
     # ON : the *_gnn_q{16,50,84}_cal branches hold calibrated quantiles.
@@ -58,11 +60,15 @@ bdt_inputs:
     # The *_gnn_point branches are identical either way.
     use_quantile_calibration: true
 
-    # What the members regress. hl = mjj/deta/eta_prod/ptsum directly: each gets
-    # *_gnn_point + *_gnn_q{16,50,84}_{raw,cal} (true quantiles of the observable).
-    # p4 = the 8 quark four-vector components (the p4 release). The script refuses
-    # a release whose members do not regress what this says.
-    target_set: hl
+    # Which model sets run:
+    #   p4  : the 8 quark four-vector components, q{1,2}_*_gnn_point +
+    #         q{1,2}_*_gnn_q{16,50,84}_{raw,cal}, plus the observables derived
+    #         from the point four-vectors as <obs>_gnn_p4_point.
+    #   hl  : mjj/deta/eta_prod/ptsum regressed directly: <obs>_gnn_point +
+    #         <obs>_gnn_q{16,50,84}_{raw,cal} (true quantiles of the observable).
+    #   both: the two sets together (graphs built once).
+    # The script refuses members that do not regress what this says.
+    target_set: both
 
   old_selection:
     # Classical reco-level VBF-pair baseline (no ML, no truth matching):
@@ -94,10 +100,11 @@ bdt_inputs:
       q2_pz: q2_pz_old
 
   targets:
-    # HL release: the REGRESSED observables, written as
-    # <branch_prefix>_gnn_point and <branch_prefix>_gnn_q{16,50,84}_{raw,cal}.
+    # The VBF observables. hl writes the REGRESSED ones as <branch_prefix>_gnn_point
+    # and <branch_prefix>_gnn_q{16,50,84}_{raw,cal}; p4 writes the ones derived
+    # from its point four-vectors as <branch_prefix>_gnn_p4_point.
     #   key          : which observable (one of mjj, deta, eta_prod, ptsum)
-    #   vbfnet_key   : the member's target key (net.target_keys)
+    #   vbfnet_key   : the hl member's target key (net.target_keys)
     #   branch_prefix: prefix of the output branch
     - {key: mjj,      vbfnet_key: mjj,      branch_prefix: mjj}
     - {key: deta,     vbfnet_key: deta,     branch_prefix: deta}
@@ -118,8 +125,9 @@ bdt_inputs:
     # Which branches go into the old-only and gnn-only files (prefix match).
     # These lists REPLACE the script defaults, they are not merged.
     # The script checks the final branch set against the contract for
-    # model.target_set (hl: 47 = 6 bookkeeping + 13 old + 28 GNN; p4: 79) and
-    # refuses to write anything else. The 6 bookkeeping branches go in every file.
+    # model.target_set (both: 107 = 6 bookkeeping + 13 old + 88 GNN;
+    # p4: 79 = 6 + 13 + 60; hl: 47 = 6 + 13 + 28) and refuses to write
+    # anything else. The 6 bookkeeping branches go in every file.
     old_prefixes: [mjj_old, deta_old, eta_prod_old, pt_sum_old, old_pass,
                    q1_E_old, q1_px_old, q1_py_old, q1_pz_old,
                    q2_E_old, q2_px_old, q2_py_old, q2_pz_old]

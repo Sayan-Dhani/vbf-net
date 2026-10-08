@@ -1,9 +1,12 @@
-"""Fold-routed inference over a set of k-fold VBF-Net checkpoints.
+"""Fold-routed inference over ONE set of k-fold VBF-Net checkpoints.
 
-``VBFNetEnsemble`` is a drop-in replacement for ``trained_model_VBFNet.VBFNet``:
-the constructor keyword names, the ``predict_root`` / ``predict_events`` /
-``predict_loader`` signatures and the returned prediction keys are preserved,
-so switching a consumer over is a one-line import change.
+``VBFNetEnsemble`` runs one model set from ``ensembles/<name>/`` (``ensemble=``,
+default ``p4``) or any release directory (``release_dir=``). It is the engine
+behind :class:`vbfnet_ensemble.unified.VBFNet`, which picks the sets from the
+requested targets and merges their predictions; use it directly for a single
+set or for checkpoints outside the package. It keeps the constructor keyword
+names and the ``predict_root`` / ``predict_events`` / ``predict_loader``
+signatures of ``trained_model_VBFNet.VBFNet``.
 
 Every event is predicted by EXACTLY ONE member (see :mod:`.routing`)::
 
@@ -45,11 +48,18 @@ from .calibration import (
 from .manifest import (
     MANIFEST_NAME,
     check_not_lfs_pointer,
+    ensemble_dir,
     load_manifest,
     sha256_file,
     state_dict_sha256,
 )
-from .pyg_vbf_dataset import NUM_TARGETS, VBFJetRootDataset, subset_dataset
+from .pyg_vbf_dataset import (
+    NUM_TARGETS,
+    DataListDataset,
+    VBFJetRootDataset,
+    build_data_from_arrays,
+    subset_dataset,
+)
 from .pyg_vbf_gnn import PyGVBFGNN
 from .routing import (
     ROUTE_RULE,
@@ -78,6 +88,7 @@ from .validate import (
 __all__ = [
     "VBFNetEnsemble",
     "build_model_from_ckpt",
+    "graphs_from_events",
     "decode_predictions",
     "decode_predictions_array",
     "predictions_array_to_dict",
@@ -142,10 +153,10 @@ def build_model_from_ckpt(ckpt: dict, device: torch.device) -> PyGVBFGNN:
     return model
 
 
-def _resolve_member_paths(checkpoint, package_root: Path) -> list[Path]:
+def _resolve_member_paths(checkpoint, release_root: Path) -> list[Path]:
     """Resolve the ``checkpoint`` argument to a concrete list of files."""
     if checkpoint is None:
-        checkpoint = package_root / "models"
+        checkpoint = release_root / "models"
 
     if isinstance(checkpoint, (str, Path)):
         path = Path(checkpoint)
@@ -173,12 +184,12 @@ def _resolve_member_paths(checkpoint, package_root: Path) -> list[Path]:
 
 
 class VBFNetEnsemble:
-    """K k-fold VBF-Net regressors, each event routed to one of them.
+    """One set of K k-fold VBF-Net regressors, each event routed to one of them.
 
     Parameters
     ----------
     checkpoint:
-        ``None`` (the bundled ``models/`` directory), a directory, a glob or an
+        ``None`` (the set's ``models/`` directory), a directory, a glob or an
         explicit sequence of files. The members must be exactly folds
         ``0 .. n_folds-1`` of one k-fold run: every event needs its member.
     device:
@@ -192,17 +203,23 @@ class VBFNetEnsemble:
         Can be flipped later (``net.use_quantile_calibration = True``) or
         overridden per call (``predict_root(..., calibrate=True)``).
     calibration_dir:
-        Directory holding the calibration. Default: the bundled
+        Directory holding the calibration. Default: the set's
         ``calibrations/``. Two layouts are understood:
         ``<dir>/fold{k}/*.json`` (one calibration per member — what ships) and
         ``<dir>/*.json`` (one calibration shared by every member).
+    ensemble:
+        Name of the bundled set to load (a directory of ``ensembles/``):
+        ``"p4"`` (the default) or ``"hl"``.
+    release_dir:
+        Instead of ``ensemble``: any directory laid out like a set
+        (``models/``, ``calibrations/``, ``RELEASE_MANIFEST.json``).
     return_members:
         Diagnostic: ALSO run every member on every event and return
         ``pred_log_members`` ``(M, N, n_targets, n_heads)``. Costs M forward
         passes instead of one; the routed prediction is unaffected.
     verify:
-        Check each file's sha256 against ``RELEASE_MANIFEST.json`` *before*
-        unpickling it. ``None`` means "verify if a manifest is present".
+        Check each file's sha256 against the set's ``RELEASE_MANIFEST.json``
+        *before* unpickling it. ``None`` means "verify if a manifest is present".
     """
 
     def __init__(
@@ -212,19 +229,27 @@ class VBFNetEnsemble:
         use_quantile_calibration: bool = False,
         calibration_dir: Union[str, Path, None] = None,
         *,
+        ensemble: str | None = None,
+        release_dir: Union[str, Path, None] = None,
         return_members: bool = False,
         verify: bool | None = None,
         strict: bool = True,
         manifest: Union[str, Path, None] = None,
         verbose: bool = True,
     ):
-        package_root = Path(__file__).resolve().parent.parent
+        if release_dir is not None and ensemble is not None:
+            raise ValueError("Pass ensemble= or release_dir=, not both.")
+        # The set directory: models/, calibrations/ and the manifest live here.
+        self.release_root = (
+            Path(release_dir).resolve() if release_dir is not None else ensemble_dir(ensemble)
+        )
+        self.ensemble = str(ensemble) if ensemble is not None else self.release_root.name
 
         self.return_members = bool(return_members)
         self.verbose = bool(verbose)
 
         if calibration_dir is None:
-            calibration_dir = package_root / "calibrations"
+            calibration_dir = self.release_root / "calibrations"
         self.calibration_dir = Path(calibration_dir)
         self._calibration_tables: list[dict] | None = None
         self._use_quantile_calibration = False
@@ -234,13 +259,13 @@ class VBFNetEnsemble:
         )
 
         # ── manifest ──────────────────────────────────────────────────────────
-        manifest_path = Path(manifest) if manifest is not None else package_root / MANIFEST_NAME
+        manifest_path = Path(manifest) if manifest is not None else self.release_root / MANIFEST_NAME
         self.manifest = load_manifest(manifest_path) if manifest_path.exists() else None
         if verify is None:
             verify = self.manifest is not None
         self.verified = bool(verify) and self.manifest is not None
 
-        member_paths = _resolve_member_paths(checkpoint, package_root)
+        member_paths = _resolve_member_paths(checkpoint, self.release_root)
 
         expected_sha = {}
         if self.verified:
@@ -334,7 +359,7 @@ class VBFNetEnsemble:
                 f"fold{m.get('fold_id')}@e{m.get('epoch')}" for m in self.member_meta
             )
             print(
-                f"[VBFNetEnsemble] members={self.n_members} [{members}]\n"
+                f"[VBFNetEnsemble] set={self.ensemble}  members={self.n_members} [{members}]\n"
                 f"[VBFNetEnsemble] route: member = {self.route}  device={self.device}  "
                 f"manifest={'verified' if self.verified else 'none'}  "
                 f"calibration={self._calibration_label()}\n"
@@ -397,14 +422,12 @@ class VBFNetEnsemble:
 
         cal_manifest = (self.manifest or {}).get("calibration", {}) or {}
         released = {str(m.get("fold_id")): m for m in (self.manifest or {}).get("members", [])}
-        bundled = self.calibration_dir.resolve() == (
-            Path(__file__).resolve().parent.parent / "calibrations"
-        ).resolve()
+        bundled = self.calibration_dir.resolve() == (self.release_root / "calibrations").resolve()
 
         # For the bundled calibration, prove each file is the one installed for
         # this member, and that it was fitted on the checkpoint being loaded.
         if self.verified and bundled and cal_manifest.get("shipped"):
-            root = Path(__file__).resolve().parent.parent
+            root = self.release_root
             for fid, meta in zip(self.member_ids, self.member_meta):
                 entry = (cal_manifest.get("members", {}) or {}).get(str(fid))
                 if entry is None:
@@ -482,6 +505,8 @@ class VBFNetEnsemble:
         result = {
             "pred_log_full": pred_log_full,
             "fold_id": np.asarray(fold, dtype=np.int64),
+            "ensemble": self.ensemble,
+            "target_keys": list(self.target_keys),
             "route": self.route,
             "n_members": self.n_members,
             "member_ids": list(self.member_ids),
@@ -517,7 +542,7 @@ class VBFNetEnsemble:
                 pred_log_full, target_specs=self.target_specs
             )
             result["pred_phys_full"] = pred_phys_full
-            # Derived observables (mjj, deta, ...) from the routed member's p4.
+            # Derived observables (q1_pt, ..., mjj_p4, ...) from the routed member's p4.
             result["pred_phys"] = predictions_array_to_dict(
                 pred_phys_full,
                 target_keys=self.target_keys,
@@ -537,12 +562,34 @@ class VBFNetEnsemble:
                 )
         return result
 
+    def _truth_columns(self, truth_keys) -> list[int] | None:
+        """Columns of a ``y`` laid out as ``truth_keys`` that hold this set's targets.
+
+        ``None`` when ``y`` already is this set's own layout. A dataset built for
+        several sets (see :class:`vbfnet_ensemble.unified.VBFNet`) carries the
+        union of their targets, and each set takes its own columns by key.
+        """
+        if truth_keys is None:
+            return None
+        truth_keys = [str(k) for k in truth_keys]
+        if truth_keys == list(self.target_keys):
+            return None
+        missing = [k for k in self.target_keys if k not in truth_keys]
+        if missing:
+            raise ValueError(
+                f"The graphs' truth y holds {truth_keys}; set {self.ensemble!r} needs "
+                f"{list(self.target_keys)} (missing {missing})."
+            )
+        return [truth_keys.index(k) for k in self.target_keys]
+
     @torch.no_grad()
     def predict_loader(
         self,
         loader: DataLoader,
         decode: bool = True,
         calibrate: bool | None = None,
+        *,
+        truth_keys: Sequence[str] | None = None,
     ):
         """Route every graph of an arbitrary loader to its member.
 
@@ -550,7 +597,8 @@ class VBFNetEnsemble:
         bundled dataset and ``predict_events`` set it). Every batch is split by
         ``event % n_folds`` and each part goes through its member only.
         ``calibrate`` overrides the ``use_quantile_calibration`` switch for this
-        call only (``None`` = use the switch).
+        call only (``None`` = use the switch). ``truth_keys`` names the columns
+        of the graphs' ``y`` when they are not this set's targets in order.
         """
         preds: list[np.ndarray] = []
         folds: list[np.ndarray] = []
@@ -583,8 +631,106 @@ class VBFNetEnsemble:
         pred = np.concatenate(preds, axis=0) if preds else np.zeros((0, len(self.target_keys), self.num_heads))
         fold = np.concatenate(folds) if folds else np.zeros(0, dtype=np.int64)
         truth = np.concatenate(truths, axis=0) if truths else None
+        if truth is not None:
+            cols = self._truth_columns(truth_keys)
+            if cols is not None:
+                truth = truth[:, cols]
         members_log = np.concatenate(members, axis=1) if members else None
         return self._finish(pred, fold, truth, decode, calibrate, members_log)
+
+    def build_dataset(
+        self,
+        root_files,
+        tree_name: str | None = None,
+        max_events: int | None = None,
+        branch_map: dict | str | Path | None = None,
+        require_truth: bool | None = False,
+        acceptance="default",
+        *,
+        config: dict | None = None,
+    ):
+        """Build the graph dataset ``predict_root`` runs on (see its options).
+
+        ``config`` replaces the members' own config. :class:`~vbfnet_ensemble.unified.VBFNet`
+        passes one whose ``targets`` are the union of every loaded set's, so a
+        single dataset serves all of them; the graph features are checked
+        against this set's members here and in :meth:`predict_dataset`.
+        """
+        if isinstance(root_files, (str, Path)):
+            root_files = [str(root_files)]
+        ds = VBFJetRootDataset(
+            root_files=[str(x) for x in root_files],
+            tree_name=tree_name,
+            max_events=max_events,
+            verbose=self.verbose,
+            config=self.config if config is None else config,
+            branch_map=load_branch_map(branch_map),
+            require_truth=require_truth,
+            acceptance=resolve_acceptance(acceptance),
+        )
+        self._check_dataset_features(ds)
+        return ds
+
+    @torch.no_grad()
+    def predict_dataset(
+        self,
+        ds,
+        batch_size: int = 512,
+        num_workers: int = 4,
+        decode: bool = True,
+        calibrate: bool | None = None,
+    ):
+        """Predict every row of a dataset from :meth:`build_dataset`.
+
+        The rows of fold k go through member k only, one loader per fold, so the
+        cost is ONE forward pass per event. The dataset is not modified, so the
+        same one can be passed to several sets.
+        """
+        self._check_dataset_features(ds)
+
+        event_ids = np.asarray(ds.event_ids, dtype=np.int64).reshape(-1, 3)
+        fold = route_folds(event_ids[:, 2], self.n_folds)
+        n = len(ds)
+        pred = np.empty((n, len(self.target_keys), self.num_heads))
+        truth = None
+        pin = self.device.type == "cuda"
+
+        for k in range(self.n_members):
+            rows = np.flatnonzero(fold == k)
+            if not len(rows):
+                continue
+            loader = DataLoader(
+                subset_dataset(ds, rows), batch_size=batch_size, shuffle=False,
+                num_workers=num_workers, pin_memory=pin,
+            )
+            pred[rows], truths = self._run(self.models[k], loader, k)
+            if truths:
+                if truth is None:
+                    truth = np.empty((n,) + truths[0].shape[1:])
+                truth[rows] = np.concatenate(truths, axis=0)
+
+        if truth is not None:
+            cols = self._truth_columns(getattr(ds, "target_keys", None) or None)
+            if cols is not None:
+                truth = truth[:, cols]
+
+        members_log = None
+        if self.return_members:
+            loader = DataLoader(ds, batch_size=batch_size, shuffle=False,
+                                num_workers=num_workers, pin_memory=pin)
+            members_log = np.stack(
+                [self._run(m, loader, mid)[0] for m, mid in zip(self.models, self.member_ids)]
+            )
+
+        result = self._finish(pred, fold, truth, decode, calibrate, members_log)
+        # Raw entry index of each kept row (single file: the TTree entry), so
+        # callers can realign per-raw-event arrays -- see make_bdt_inputs.
+        result["event_index"] = np.asarray(ds.raw_event_indices, dtype=np.int64)
+        result["run"] = event_ids[:, 0]
+        result["lumi"] = event_ids[:, 1]
+        result["event"] = event_ids[:, 2]
+        result["acceptance"] = getattr(ds, "acceptance", None)
+        return result
 
     @torch.no_grad()
     def predict_root(
@@ -614,61 +760,18 @@ class VBFNetEnsemble:
         ``{logical: actual}`` or the path of a YAML file laid out like
         ``branch_map.yaml`` (see :mod:`vbfnet_ensemble.branch_map`).
 
-        The dataset is built once; the rows of fold k go through member k only,
-        one loader per fold, so the cost is ONE forward pass per event.
+        The dataset is built once (:meth:`build_dataset`); the rows of fold k go
+        through member k only (:meth:`predict_dataset`), so the cost is ONE
+        forward pass per event.
         """
-        if isinstance(root_files, (str, Path)):
-            root_files = [str(root_files)]
         acceptance = resolve_acceptance(acceptance)
-
-        ds = VBFJetRootDataset(
-            root_files=[str(x) for x in root_files],
-            tree_name=tree_name,
-            max_events=max_events,
-            verbose=self.verbose,
-            config=self.config,
-            branch_map=load_branch_map(branch_map),
-            require_truth=require_truth,
-            acceptance=acceptance,
+        ds = self.build_dataset(
+            root_files, tree_name=tree_name, max_events=max_events, branch_map=branch_map,
+            require_truth=require_truth, acceptance=acceptance,
         )
-        self._check_dataset_features(ds)
-
-        event_ids = np.asarray(ds.event_ids, dtype=np.int64).reshape(-1, 3)
-        fold = route_folds(event_ids[:, 2], self.n_folds)
-        n = len(ds)
-        pred = np.empty((n, len(self.target_keys), self.num_heads))
-        truth = None
-        pin = self.device.type == "cuda"
-
-        for k in range(self.n_members):
-            rows = np.flatnonzero(fold == k)
-            if not len(rows):
-                continue
-            loader = DataLoader(
-                subset_dataset(ds, rows), batch_size=batch_size, shuffle=False,
-                num_workers=num_workers, pin_memory=pin,
-            )
-            pred[rows], truths = self._run(self.models[k], loader, k)
-            if truths:
-                if truth is None:
-                    truth = np.empty((n,) + truths[0].shape[1:])
-                truth[rows] = np.concatenate(truths, axis=0)
-
-        members_log = None
-        if self.return_members:
-            loader = DataLoader(ds, batch_size=batch_size, shuffle=False,
-                                num_workers=num_workers, pin_memory=pin)
-            members_log = np.stack(
-                [self._run(m, loader, mid)[0] for m, mid in zip(self.models, self.member_ids)]
-            )
-
-        result = self._finish(pred, fold, truth, decode, calibrate, members_log)
-        # Raw entry index of each kept row (single file: the TTree entry), so
-        # callers can realign per-raw-event arrays -- see make_bdt_inputs.
-        result["event_index"] = np.asarray(ds.raw_event_indices, dtype=np.int64)
-        result["run"] = event_ids[:, 0]
-        result["lumi"] = event_ids[:, 1]
-        result["event"] = event_ids[:, 2]
+        result = self.predict_dataset(
+            ds, batch_size=batch_size, num_workers=num_workers, decode=decode, calibrate=calibrate,
+        )
         result["acceptance"] = acceptance
         return result
 
@@ -688,39 +791,9 @@ class VBFNetEnsemble:
         member). Events failing the acceptance gate get no prediction; the
         returned ``input_index`` says which inputs each row came from.
         """
-        from .pyg_vbf_dataset import DataListDataset, build_data_from_arrays
-
-        acceptance = resolve_acceptance(acceptance)
-        graphs, kept = [], []
-        for i, ev in enumerate(events):
-            if "event" not in ev:
-                raise KeyError(
-                    f"events[{i}] has no 'event' key: the fold-routed predictor needs "
-                    f"the CMS event number of every event (member = {self.route})."
-                )
-            data = build_data_from_arrays(
-                vbf_jets=ev.get("vbf_jets"),
-                hbb=ev["hbb"],
-                htt=ev["htt"],
-                met=ev["met"],
-                cfg=self.config,
-                acceptance=acceptance,
-            )
-            if data is not None:
-                data.event = torch.tensor([int(ev["event"])], dtype=torch.long)
-                graphs.append(data)
-                kept.append(i)
-
-        if not graphs:
-            raise ValueError("No usable events: every event failed the acceptance gate.")
-        n_dropped = len(events) - len(graphs)
-        if n_dropped and self.verbose:
-            print(
-                f"[VBFNetEnsemble] predict_events: {n_dropped} event(s) failed the "
-                "acceptance gate and got no prediction.",
-                flush=True,
-            )
-
+        graphs, kept = graphs_from_events(
+            events, self.config, acceptance, route=self.route, verbose=self.verbose,
+        )
         loader = DataLoader(
             DataListDataset(graphs),
             batch_size=batch_size,
@@ -731,3 +804,43 @@ class VBFNetEnsemble:
         result = self.predict_loader(loader, decode=decode, calibrate=calibrate)
         result["input_index"] = np.asarray(kept, dtype=np.int64)
         return result
+
+
+def graphs_from_events(events, cfg, acceptance="default", *, route=ROUTE_RULE, verbose=True):
+    """Build the graphs of in-memory events: ``(graphs, kept input indices)``.
+
+    Each event dict needs ``hbb``, ``htt``, ``met``, optionally ``vbf_jets``, and
+    the CMS ``event`` number, which picks the member. Events failing the
+    acceptance gate are skipped; raises if none is left.
+    """
+    acceptance = resolve_acceptance(acceptance)
+    graphs, kept = [], []
+    for i, ev in enumerate(events):
+        if "event" not in ev:
+            raise KeyError(
+                f"events[{i}] has no 'event' key: the fold-routed predictor needs "
+                f"the CMS event number of every event (member = {route})."
+            )
+        data = build_data_from_arrays(
+            vbf_jets=ev.get("vbf_jets"),
+            hbb=ev["hbb"],
+            htt=ev["htt"],
+            met=ev["met"],
+            cfg=cfg,
+            acceptance=acceptance,
+        )
+        if data is not None:
+            data.event = torch.tensor([int(ev["event"])], dtype=torch.long)
+            graphs.append(data)
+            kept.append(i)
+
+    if not graphs:
+        raise ValueError("No usable events: every event failed the acceptance gate.")
+    n_dropped = len(events) - len(graphs)
+    if n_dropped and verbose:
+        print(
+            f"[VBFNetEnsemble] predict_events: {n_dropped} event(s) failed the "
+            "acceptance gate and got no prediction.",
+            flush=True,
+        )
+    return graphs, kept

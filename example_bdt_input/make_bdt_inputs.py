@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Make BDT input ROOT files from VBFNet_Ensemble (5 k-fold members, fold-routed).
+"""Make BDT input ROOT files from VBFNet_Ensemble (fold-routed k-fold model sets).
 
 What this script does
 =====================
@@ -17,15 +17,34 @@ For one SIGNAL and one BACKGROUND ROOT file it writes, per event:
    quarks the GNN regresses, so ``q1_E_old`` and ``q1_E_gnn_point`` describe the
    same object.
 
-2. **GNN regression** — the generator-level VBF quark four-vectors. Each event
-   is predicted by ONE member, ``gnn_fold = event % 5`` (the rule the training
-   split used), so on the training signal samples every value is the
-   out-of-fold prediction. Branches (60):
+2. **GNN regression.** Each event is predicted by ONE member of each model set,
+   ``gnn_fold = event % 5`` (the rule the training split used), so on the
+   training signal samples every value is the out-of-fold prediction.
+   ``model.target_set`` picks the sets:
 
-       {mjj,deta,eta_prod,pt_sum}_gnn_point                     4   derived
-       {q1,q2}_{E,px,py,pz}_gnn_point                           8   regressed
-       {q1,q2}_{E,px,py,pz}_gnn_{q16,q50,q84}_raw              24   regressed
-       {q1,q2}_{E,px,py,pz}_gnn_{q16,q50,q84}_cal              24   regressed
+   * ``p4``: the p4 set, which regresses the quark four-vectors. Branches (60):
+
+         {mjj,deta,eta_prod,pt_sum}_gnn_p4_point                  4   derived
+         {q1,q2}_{E,px,py,pz}_gnn_point                           8   regressed
+         {q1,q2}_{E,px,py,pz}_gnn_{q16,q50,q84}_raw              24   regressed
+         {q1,q2}_{E,px,py,pz}_gnn_{q16,q50,q84}_cal              24   regressed
+
+     The four derived observables are built from the ``point`` four-vectors
+     only. No quantiles are written for them: mjj computed from the q16
+     components is NOT the 16% quantile of mjj.
+
+   * ``hl``: the hl set, which regresses ``mjj, deta, eta_prod, ptsum``
+     DIRECTLY, so every observable gets the full set and its quantiles are true
+     quantiles of that observable. Branches (28):
+
+         {mjj,deta,eta_prod,pt_sum}_gnn_point                     4   regressed
+         {mjj,deta,eta_prod,pt_sum}_gnn_{q16,q50,q84}_raw        12   regressed
+         {mjj,deta,eta_prod,pt_sum}_gnn_{q16,q50,q84}_cal        12   regressed
+
+   * ``both`` (the shipped config): both sets, all 88 branches above.
+
+   Name rule, as in the package: ``<obs>_gnn_*`` is always the REGRESSED (hl)
+   observable; the value derived from the p4 four-vectors is ``<obs>_gnn_p4_point``.
 
    * ``_gnn_point``: the routed member's central estimate.
    * ``_raw``: the routed member's uncalibrated quantiles.
@@ -33,31 +52,15 @@ For one SIGNAL and one BACKGROUND ROOT file it writes, per event:
      on its out-of-fold rows (see ../README.md, "Quantile calibration").
      If calibration is switched off, ``_cal`` is a copy of ``_raw``, exactly as
      in the old script.
-   * The four derived observables are built from the ``point`` four-vectors
-     only. No quantiles are written for them: mjj computed from the q16
-     components is NOT the 16% quantile of mjj.
-
-   **HL releases** (``model.target_set: hl``): the members regress
-   ``mjj, deta, eta_prod, ptsum`` DIRECTLY, so every observable gets the full
-   set and its quantiles are true quantiles of that observable. Branches (28):
-
-       {mjj,deta,eta_prod,pt_sum}_gnn_point                     4   regressed
-       {mjj,deta,eta_prod,pt_sum}_gnn_{q16,q50,q84}_raw        12   regressed
-       {mjj,deta,eta_prod,pt_sum}_gnn_{q16,q50,q84}_cal        12   regressed
-
-   The point branch names are the same as the p4 release's derived ones, so a
-   BDT reading ``mjj_gnn_point`` works with either release. Total with the old
-   selection and bookkeeping: **47 branches**.
 
 3. Six bookkeeping branches: ``event_idx`` (ROOT entry), ``label`` (1 = signal,
    0 = bkg), the CMS event id ``run`` / ``luminosityBlock`` / ``event``, and
    ``gnn_fold`` (the member that made the GNN values, = ``event % 5``).
 
-Total: **79 branches** per tree in the combined file (contract v2 = the 75 of
-the previous single-model BDT-input script, plus ``run``, ``luminosityBlock``,
-``event``, ``gnn_fold``).
-:func:`expected_branches` rebuilds it from the config and the script refuses to
-write a tree that differs from it by a single name.
+Total per tree in the combined file: **107 branches** for ``both``
+(6 bookkeeping + 13 old + 88 GNN), **79** for ``p4``, **47** for ``hl``.
+:func:`expected_branches` rebuilds the list from the config and the script
+refuses to write a tree that differs from it by a single name.
 
 Which events get a row: the deployment acceptance gate (``acceptance`` in the
 config): at least ``min_jets`` VBF jets with pT >= ``jet_min_pt`` and
@@ -67,19 +70,20 @@ No generator-level cut is applied.
 Output files (in ``outputs.outdir``), each with a ``sig`` and a ``bkg`` TTree:
 
     bdt_inputs_old_selection.root   6 bookkeeping + the 13 old branches
-    bdt_inputs_gnn.root             6 bookkeeping + the 60 GNN branches
-    bdt_inputs_combined.root        all 79
+    bdt_inputs_gnn.root             6 bookkeeping + the GNN branches
+    bdt_inputs_combined.root        all of them
     bdt_inputs_provenance.json      what produced the files (model, cuts, counts)
 
 What changed compared with the old script
 =========================================
 Same branches, same YAML layout, same command-line flags. Four things differ:
 
-* **Model**: the 5 k-fold members, each event routed to member ``event % 5``,
-  instead of the single fold-1 model.
+* **Model**: the 5 k-fold members of each model set, each event routed to
+  member ``event % 5``, instead of the single fold-1 model.
   ``model.checkpoint`` now means a *directory of members* (``null`` = the
-  bundled release), and ``model.calibration_dir`` a per-member calibration
-  directory (``null`` = the bundled one).
+  bundled set), and ``model.calibration_dir`` a per-member calibration
+  directory (``null`` = the bundled one); both replace ONE set, so they need
+  ``target_set: p4`` or ``hl``.
 
 * **Row alignment (bug fix).** The GNN dataset drops events it cannot turn into
   a graph (fewer than 2 VBF jets), but the old selection keeps one row per raw
@@ -103,8 +107,8 @@ Same branches, same YAML layout, same command-line flags. Four things differ:
 
 Usage
 =====
-From the ``VBFNet_Ensemble`` directory (the script adds it to ``sys.path``, so
-no ``pip install`` is needed)::
+From the repository root (the script adds it to ``sys.path``, so no
+``pip install`` is needed)::
 
     # needs PyROOT, torch and torch_geometric in the environment
     python3 example_bdt_input/make_bdt_inputs.py \\
@@ -166,12 +170,13 @@ DEFAULT_BDT_CONFIG: dict[str, Any] = {
     # Deployment gate: which events get a GNN prediction (and a row). Reco only.
     "acceptance": {"min_jets": 2, "jet_min_pt": 50.0, "jet_max_abs_eta": 4.7},
     "model": {
-        "checkpoint": None,             # directory of member .pt files; None = bundled
-        "calibration_dir": None,        # per-member calibration dir; None = bundled
+        "checkpoint": None,             # directory of member .pt files; None = bundled (p4/hl only)
+        "calibration_dir": None,        # per-member calibration dir; None = bundled (p4/hl only)
         "use_quantile_calibration": True,   # fills the *_cal branches
-        # What the members regress: "p4" = the 8 q{1,2}_{E,px,py,pz} (observables
-        # derived from the point p4), "hl" = mjj/deta/eta_prod/ptsum directly.
-        "target_set": "p4",
+        # Which model sets run: "p4" = the 8 q{1,2}_{E,px,py,pz} (observables
+        # derived from the point p4), "hl" = mjj/deta/eta_prod/ptsum regressed
+        # directly, "both" = the two sets together.
+        "target_set": "both",
     },
     "old_selection": {
         "deta_cut": 3.0,                # require |eta1 - eta2| > deta_cut
@@ -187,7 +192,8 @@ DEFAULT_BDT_CONFIG: dict[str, Any] = {
             "q2_E": "q2_E_old", "q2_px": "q2_px_old", "q2_py": "q2_py_old", "q2_pz": "q2_pz_old",
         },
     },
-    # Derived observables written as <branch_prefix>_gnn_point.
+    # The VBF observables: hl writes <branch_prefix>_gnn_* (regressed), p4 writes
+    # <branch_prefix>_gnn_p4_point (derived from the point four-vectors).
     "targets": [
         {"key": "mjj", "vbfnet_key": "mjj", "branch_prefix": "mjj"},
         {"key": "deta", "vbfnet_key": "deta", "branch_prefix": "deta"},
@@ -228,23 +234,35 @@ QUANTILE_HEADS = ("q16", "q50", "q84")
 #: Branches that are not physics quantities.
 BOOKKEEPING_BRANCHES = ("event_idx", "label", "run", "luminosityBlock", "event", "gnn_fold")
 
-#: ``model.target_set`` values: what the ensemble members regress.
-TARGET_SETS = ("p4", "hl")
+#: Suffix of the GNN branches derived from the p4 four-vectors (``mjj_gnn_p4_point``).
+P4_DERIVED_TAG = "p4"
+
+#: ``model.target_set`` values: which model sets run.
+TARGET_SETS = ("p4", "hl", "both")
 
 
 def target_set(cfg: dict[str, Any]) -> str:
-    """``model.target_set``: ``p4`` (default) or ``hl``."""
-    value = str(get_path(cfg, "model.target_set", "p4") or "p4").lower()
+    """``model.target_set``: ``p4``, ``hl`` or ``both`` (default)."""
+    value = str(get_path(cfg, "model.target_set", "both") or "both").lower()
     if value not in TARGET_SETS:
         raise ValueError(f"model.target_set must be one of {TARGET_SETS}, got {value!r}")
     return value
 
 
+def model_sets(cfg: dict[str, Any]) -> list[str]:
+    """The package model sets ``model.target_set`` runs, in output order."""
+    value = target_set(cfg)
+    return ["p4", "hl"] if value == "both" else [value]
+
+
 def required_member_keys(cfg: dict[str, Any], targets: list[dict[str, str]]) -> list[str]:
-    """Target keys the members must regress for this config."""
-    if target_set(cfg) == "hl":
-        return [t["vbfnet_key"] for t in targets]
-    return list(P4_TARGET_KEYS)
+    """Target keys the loaded members must regress for this config."""
+    need: list[str] = []
+    if "p4" in model_sets(cfg):
+        need += list(P4_TARGET_KEYS)
+    if "hl" in model_sets(cfg):
+        need += [t["vbfnet_key"] for t in targets]
+    return need
 
 
 # ── small YAML helpers ──
@@ -369,23 +387,25 @@ def expected_old_branches(cfg: dict[str, Any]) -> list[str]:
 def expected_gnn_branches(cfg: dict[str, Any]) -> list[str]:
     """GNN branch names.
 
-    ``p4`` (60): 4 derived point + 8 x (point + 3 raw + 3 cal).
+    ``p4`` (60): 4 derived ``*_gnn_p4_point`` + 8 x (point + 3 raw + 3 cal).
     ``hl`` (28): 4 regressed observables x (point + 3 raw + 3 cal).
+    ``both`` (88): the two together.
     """
-    if target_set(cfg) == "hl":
-        names = []
+    names: list[str] = []
+    sets = model_sets(cfg)
+    if "p4" in sets:
+        names += [f"{t['branch_prefix']}_gnn_{P4_DERIVED_TAG}_point" for t in target_list(cfg)]
+        for key in P4_TARGET_KEYS:
+            names.append(f"{key}_gnn_point")
+            for q in QUANTILE_HEADS:
+                names.append(f"{key}_gnn_{q}_raw")
+                names.append(f"{key}_gnn_{q}_cal")
+    if "hl" in sets:
         for t in target_list(cfg):
             names.append(f"{t['branch_prefix']}_gnn_point")
             for q in QUANTILE_HEADS:
                 names.append(f"{t['branch_prefix']}_gnn_{q}_raw")
                 names.append(f"{t['branch_prefix']}_gnn_{q}_cal")
-        return names
-    names = [f"{t['branch_prefix']}_gnn_point" for t in target_list(cfg)]
-    for key in P4_TARGET_KEYS:
-        names.append(f"{key}_gnn_point")
-        for q in QUANTILE_HEADS:
-            names.append(f"{key}_gnn_{q}_raw")
-            names.append(f"{key}_gnn_{q}_cal")
     return names
 
 
@@ -627,17 +647,32 @@ def build_gnn_branches(
     pred_raw: dict,
     pred_cal: dict | None,
     targets: list[dict[str, str]],
-    target_set: str = "p4",
+    target_set: str = "both",
 ) -> dict[str, np.ndarray]:
-    """Turn the ensemble's prediction dicts into the GNN branches (60 p4 / 28 hl).
+    """Turn the prediction dicts into the GNN branches (60 p4 / 28 hl / 88 both).
 
     ``pred_raw`` is ``out["pred_phys"]``; ``pred_cal`` is
     ``out["pred_phys_cal"]`` or ``None`` when calibration is off, in which case
     the ``_cal`` branches are copies of the ``_raw`` ones.
     """
     gnn: dict[str, np.ndarray] = {}
+    sets = ["p4", "hl"] if target_set == "both" else [target_set]
 
-    if target_set == "hl":
+    if "p4" in sets:
+        # Derived observables: point head only.
+        derived = derive_observables_from_p4(pred_raw, "point")
+        for spec in targets:
+            gnn[f"{spec['branch_prefix']}_gnn_{P4_DERIVED_TAG}_point"] = derived[spec["key"]]
+
+        # Regressed components: point + raw quantiles + calibrated quantiles.
+        for key in P4_TARGET_KEYS:
+            gnn[f"{key}_gnn_point"] = _require(pred_raw, key, "point")
+            for q in QUANTILE_HEADS:
+                raw = _require(pred_raw, key, q)
+                gnn[f"{key}_gnn_{q}_raw"] = raw
+                gnn[f"{key}_gnn_{q}_cal"] = _require(pred_cal, key, q) if pred_cal is not None else raw.copy()
+
+    if "hl" in sets:
         # Regressed observables: point + raw quantiles + calibrated quantiles.
         for spec in targets:
             key, prefix = spec["vbfnet_key"], spec["branch_prefix"]
@@ -647,20 +682,6 @@ def build_gnn_branches(
                 gnn[f"{prefix}_gnn_{q}_raw"] = raw
                 gnn[f"{prefix}_gnn_{q}_cal"] = (_require(pred_cal, key, q)
                                                 if pred_cal is not None else raw.copy())
-        return gnn
-
-    # Derived observables: point head only.
-    derived = derive_observables_from_p4(pred_raw, "point")
-    for spec in targets:
-        gnn[f"{spec['branch_prefix']}_gnn_point"] = derived[spec["key"]]
-
-    # Regressed components: point + raw quantiles + calibrated quantiles.
-    for key in P4_TARGET_KEYS:
-        gnn[f"{key}_gnn_point"] = _require(pred_raw, key, "point")
-        for q in QUANTILE_HEADS:
-            raw = _require(pred_raw, key, q)
-            gnn[f"{key}_gnn_{q}_raw"] = raw
-            gnn[f"{key}_gnn_{q}_cal"] = _require(pred_cal, key, q) if pred_cal is not None else raw.copy()
 
     return gnn
 
@@ -675,7 +696,7 @@ def predict_gnn_for_file(
     targets: list[dict[str, str]],
     acceptance: dict | None = None,
     branch_map: dict[str, str] | None = None,
-    target_set: str = "p4",
+    target_set: str = "both",
 ) -> tuple[dict[str, np.ndarray], np.ndarray, dict[str, np.ndarray]]:
     """Run the fold-routed predictor on one file.
 
@@ -705,7 +726,9 @@ def predict_gnn_for_file(
             "The predictor did not return event_index; rows cannot be matched "
             "to the old selection safely."
         )
-    need = [t["vbfnet_key"] for t in targets] if target_set == "hl" else list(P4_TARGET_KEYS)
+    sets = ["p4", "hl"] if target_set == "both" else [target_set]
+    need = (list(P4_TARGET_KEYS) if "p4" in sets else []) + (
+        [t["vbfnet_key"] for t in targets] if "hl" in sets else [])
     if not all(k in out["pred_phys"] for k in need):
         raise RuntimeError(f"target_set={target_set} needs targets {need}; got {sorted(out['pred_phys'])}")
 
@@ -788,6 +811,35 @@ def write_two_tree_root(path: Path, sig_tree: dict, bkg_tree: dict, tree_names: 
     print(f"[saved] {path}")
 
 
+def load_net(cfg: dict, use_cal: bool):
+    """The predictor for ``model.target_set``.
+
+    The bundled sets go through :class:`vbfnet_ensemble.VBFNet`, which builds
+    the graphs once for all of them. ``model.checkpoint`` / ``calibration_dir``
+    replace the members of ONE set, so they need ``target_set`` ``p4`` or ``hl``.
+    """
+    model_cfg, runtime = cfg["model"], cfg["runtime"]
+    sets = model_sets(cfg)
+    if model_cfg.get("checkpoint") or model_cfg.get("calibration_dir"):
+        if len(sets) != 1:
+            raise SystemExit(
+                "model.checkpoint / model.calibration_dir replace the members of one set; "
+                f"set model.target_set to p4 or hl (it is {target_set(cfg)!r})."
+            )
+        from vbfnet_ensemble import VBFNetEnsemble
+
+        return VBFNetEnsemble(
+            checkpoint=model_cfg.get("checkpoint"),
+            device=runtime.get("device"),
+            use_quantile_calibration=use_cal,
+            calibration_dir=model_cfg.get("calibration_dir"),
+            ensemble=sets[0],
+        )
+    from vbfnet_ensemble import VBFNet
+
+    return VBFNet(targets=sets, device=runtime.get("device"), use_quantile_calibration=use_cal)
+
+
 def process_file(net, path: str, label: int, cap: int | None, cfg: dict, targets: list,
                  branch_map: dict[str, str] | None = None) -> dict:
     """GNN first (to learn which events survive), then the old selection on
@@ -838,6 +890,7 @@ def build_config(args: argparse.Namespace) -> dict[str, Any]:
         "runtime.batch_size": args.batch_size,
         "runtime.num_workers": args.num_workers,
         "runtime.device": args.device,
+        "model.target_set": args.target_set,
         "model.checkpoint": args.checkpoint,
         "model.calibration_dir": args.calibration_dir,
         "old_selection.deta_cut": args.deta_cut,
@@ -871,10 +924,12 @@ def get_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--batch_size", type=int, default=None)
     p.add_argument("--num_workers", type=int, default=None)
     p.add_argument("--device", default=None)
+    p.add_argument("--target_set", default=None, choices=TARGET_SETS,
+                   help="Model sets to run: p4, hl or both (default: the YAML's, else both)")
     p.add_argument("--checkpoint", default=None,
-                   help="Directory of ensemble member .pt files (default: the bundled release)")
+                   help="Directory of member .pt files replacing ONE set's (needs --target_set p4 or hl)")
     p.add_argument("--calibration_dir", default=None,
-                   help="Per-member calibration directory (default: the bundled one)")
+                   help="Per-member calibration directory for that set (default: the bundled one)")
     p.add_argument("--no_calibration", action="store_true",
                    help="Switch quantile calibration off (the *_cal branches then copy *_raw)")
     p.add_argument("--deta_cut", type=float, default=None)
@@ -920,22 +975,15 @@ def main(argv: list[str] | None = None) -> int:
     print(f"branches    : {len(expected['combined'])} per tree in the combined file")
     print("=" * 80)
 
-    from vbfnet_ensemble import VBFNetEnsemble
-
-    net = VBFNetEnsemble(
-        checkpoint=model_cfg.get("checkpoint"),
-        device=runtime.get("device"),
-        use_quantile_calibration=use_cal,
-        calibration_dir=model_cfg.get("calibration_dir"),
-    )
-    # Fail before reading any ROOT file if the release does not regress what
-    # this config expects (e.g. an HL config pointed at the p4 release).
+    net = load_net(cfg, use_cal)
+    # Fail before reading any ROOT file if the members do not regress what
+    # this config expects (e.g. an hl config pointed at p4 checkpoints).
     need = required_member_keys(cfg, targets)
     missing = [k for k in need if k not in list(net.target_keys)]
     if missing:
         raise SystemExit(
             f"model.target_set={target_set(cfg)} needs member targets {need}, but the "
-            f"release regresses {list(net.target_keys)} (missing {missing})."
+            f"loaded members regress {list(net.target_keys)} (missing {missing})."
         )
 
     sig_tree = process_file(net, signal, 1, sig_cap, cfg, targets, branch_map=branch_map)
@@ -961,21 +1009,29 @@ def main(argv: list[str] | None = None) -> int:
     # A small record of what produced these files.
     from vbfnet_ensemble import __version__
 
+    sets = getattr(net, "ensembles", None) or {net.ensemble: net}
     provenance = {
         "created": _dt.datetime.now().astimezone().isoformat(timespec="seconds"),
         "vbfnet_ensemble_version": __version__,
-        "release_manifest": (net.manifest or {}).get("release"),
-        "members": [
-            {"fold_id": m.get("fold_id"), "epoch": m.get("epoch"), "file": m.get("file")}
-            for m in net.member_meta
-        ],
         "route": f"member = {net.route}",
         "target_set": target_set(cfg),
         "member_target_keys": list(net.target_keys),
-        "member_split_modes": ((net.manifest or {}).get("routing", {}) or {}).get("member_split_modes"),
+        "model_sets": {
+            name: {
+                "release_manifest": (ens.manifest or {}).get("release"),
+                "config_hash": ((ens.manifest or {}).get("shared", {}) or {}).get("config_hash"),
+                "members": [
+                    {"fold_id": m.get("fold_id"), "epoch": m.get("epoch"), "file": m.get("file")}
+                    for m in ens.member_meta
+                ],
+                "member_target_keys": list(ens.target_keys),
+                "member_split_modes": ((ens.manifest or {}).get("routing", {}) or {}).get("member_split_modes"),
+                "calibration": ens._calibration_label(),
+            }
+            for name, ens in sets.items()
+        },
         "acceptance": cfg.get("acceptance"),
         "branch_map_renamed": renamed,
-        "calibration": net._calibration_label(),
         "config": cfg,
         "events": {
             "signal": int(len(sig_tree["event_idx"])),
