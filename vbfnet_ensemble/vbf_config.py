@@ -183,16 +183,29 @@ def config_hash(cfg: dict[str, Any]) -> str:
 # weights are attached after the cache is loaded, never baked into it.)
 DATASET_HASH_SECTIONS = ("features", "targets", "dataset")
 
+# Per-target keys that only steer the LOSS and the checkpoint metric. They are
+# read by QuantileLoss / compute_selection_score and never touch the stored y,
+# so rebalancing them (e.g. after a pilot) must not invalidate the cache.
+# config_hash still covers them, so runs stay distinguishable.
+TARGET_LOSS_ONLY_KEYS = ("loss_weight", "point_loss_weight", "error_mode")
+
 
 def dataset_hash(cfg: dict[str, Any]) -> str:
     """Stable hash of only the config parts that determine dataset content.
 
     Used to key/validate the dataset cache so that changing training-only knobs
     (num_workers, epochs, batch_size, dropout, checkpoint weights, reweighting,
-    …) does not force an expensive rebuild from ROOT. See
-    :data:`DATASET_HASH_SECTIONS`.
+    per-target loss weights, …) does not force an expensive rebuild from ROOT.
+    See :data:`DATASET_HASH_SECTIONS` and :data:`TARGET_LOSS_ONLY_KEYS`.
     """
     subset = {k: cfg.get(k) for k in DATASET_HASH_SECTIONS}
+    targets = subset.get("targets")
+    if isinstance(targets, list):
+        subset["targets"] = [
+            {k: v for k, v in t.items() if k not in TARGET_LOSS_ONLY_KEYS}
+            if isinstance(t, dict) else t
+            for t in targets
+        ]
     payload = json.dumps(subset, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 

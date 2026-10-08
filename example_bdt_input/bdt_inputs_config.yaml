@@ -1,4 +1,5 @@
-# Configuration for example_bdt_input/make_bdt_inputs.py
+# Configuration for example_bdt_input/make_bdt_inputs.py -- HL release
+# (members regress mjj, deta, eta_prod, ptsum directly; model.target_set: hl).
 #
 # Precedence: script defaults  <  this file  <  command-line flags.
 # Relative paths are resolved from the directory you RUN the script in
@@ -57,6 +58,12 @@ bdt_inputs:
     # The *_gnn_point branches are identical either way.
     use_quantile_calibration: true
 
+    # What the members regress. hl = mjj/deta/eta_prod/ptsum directly: each gets
+    # *_gnn_point + *_gnn_q{16,50,84}_{raw,cal} (true quantiles of the observable).
+    # p4 = the 8 quark four-vector components (the p4 release). The script refuses
+    # a release whose members do not regress what this says.
+    target_set: hl
+
   old_selection:
     # Classical reco-level VBF-pair baseline (no ML, no truth matching):
     # among pT-sorted VBFJets, take the pair with the largest mjj that has
@@ -87,10 +94,10 @@ bdt_inputs:
       q2_pz: q2_pz_old
 
   targets:
-    # Observables DERIVED from the regressed q1/q2 four-vectors (point head),
-    # written as <branch_prefix>_gnn_point.
+    # HL release: the REGRESSED observables, written as
+    # <branch_prefix>_gnn_point and <branch_prefix>_gnn_q{16,50,84}_{raw,cal}.
     #   key          : which observable (one of mjj, deta, eta_prod, ptsum)
-    #   vbfnet_key   : kept for compatibility with the old config; unused
+    #   vbfnet_key   : the member's target key (net.target_keys)
     #   branch_prefix: prefix of the output branch
     - {key: mjj,      vbfnet_key: mjj,      branch_prefix: mjj}
     - {key: deta,     vbfnet_key: deta,     branch_prefix: deta}
@@ -110,8 +117,8 @@ bdt_inputs:
 
     # Which branches go into the old-only and gnn-only files (prefix match).
     # These lists REPLACE the script defaults, they are not merged.
-    # The script checks the final branch set against the fixed 79-branch
-    # contract (v2: the old 75 + run, luminosityBlock, event, gnn_fold) and
+    # The script checks the final branch set against the contract for
+    # model.target_set (hl: 47 = 6 bookkeeping + 13 old + 28 GNN; p4: 79) and
     # refuses to write anything else. The 6 bookkeeping branches go in every file.
     old_prefixes: [mjj_old, deta_old, eta_prod_old, pt_sum_old, old_pass,
                    q1_E_old, q1_px_old, q1_py_old, q1_pz_old,

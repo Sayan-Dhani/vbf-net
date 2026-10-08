@@ -37,6 +37,18 @@ For one SIGNAL and one BACKGROUND ROOT file it writes, per event:
      only. No quantiles are written for them: mjj computed from the q16
      components is NOT the 16% quantile of mjj.
 
+   **HL releases** (``model.target_set: hl``): the members regress
+   ``mjj, deta, eta_prod, ptsum`` DIRECTLY, so every observable gets the full
+   set and its quantiles are true quantiles of that observable. Branches (28):
+
+       {mjj,deta,eta_prod,pt_sum}_gnn_point                     4   regressed
+       {mjj,deta,eta_prod,pt_sum}_gnn_{q16,q50,q84}_raw        12   regressed
+       {mjj,deta,eta_prod,pt_sum}_gnn_{q16,q50,q84}_cal        12   regressed
+
+   The point branch names are the same as the p4 release's derived ones, so a
+   BDT reading ``mjj_gnn_point`` works with either release. Total with the old
+   selection and bookkeeping: **47 branches**.
+
 3. Six bookkeeping branches: ``event_idx`` (ROOT entry), ``label`` (1 = signal,
    0 = bkg), the CMS event id ``run`` / ``luminosityBlock`` / ``event``, and
    ``gnn_fold`` (the member that made the GNN values, = ``event % 5``).
@@ -157,6 +169,9 @@ DEFAULT_BDT_CONFIG: dict[str, Any] = {
         "checkpoint": None,             # directory of member .pt files; None = bundled
         "calibration_dir": None,        # per-member calibration dir; None = bundled
         "use_quantile_calibration": True,   # fills the *_cal branches
+        # What the members regress: "p4" = the 8 q{1,2}_{E,px,py,pz} (observables
+        # derived from the point p4), "hl" = mjj/deta/eta_prod/ptsum directly.
+        "target_set": "p4",
     },
     "old_selection": {
         "deta_cut": 3.0,                # require |eta1 - eta2| > deta_cut
@@ -212,6 +227,24 @@ QUANTILE_HEADS = ("q16", "q50", "q84")
 
 #: Branches that are not physics quantities.
 BOOKKEEPING_BRANCHES = ("event_idx", "label", "run", "luminosityBlock", "event", "gnn_fold")
+
+#: ``model.target_set`` values: what the ensemble members regress.
+TARGET_SETS = ("p4", "hl")
+
+
+def target_set(cfg: dict[str, Any]) -> str:
+    """``model.target_set``: ``p4`` (default) or ``hl``."""
+    value = str(get_path(cfg, "model.target_set", "p4") or "p4").lower()
+    if value not in TARGET_SETS:
+        raise ValueError(f"model.target_set must be one of {TARGET_SETS}, got {value!r}")
+    return value
+
+
+def required_member_keys(cfg: dict[str, Any], targets: list[dict[str, str]]) -> list[str]:
+    """Target keys the members must regress for this config."""
+    if target_set(cfg) == "hl":
+        return [t["vbfnet_key"] for t in targets]
+    return list(P4_TARGET_KEYS)
 
 
 # ── small YAML helpers ──
@@ -297,7 +330,11 @@ def as_bool(value: Any) -> bool:
 
 
 def target_list(cfg: dict[str, Any]) -> list[dict[str, str]]:
-    """Validate and normalise the ``targets`` list (the derived observables)."""
+    """Validate and normalise the ``targets`` list.
+
+    ``p4``: the observables derived from the point p4 (``vbfnet_key`` unused).
+    ``hl``: the regressed observables; ``vbfnet_key`` is the member's target key.
+    """
     targets = cfg.get("targets", [])
     if not isinstance(targets, list) or not targets:
         raise ValueError("bdt_inputs.targets must be a non-empty list")
@@ -330,7 +367,19 @@ def expected_old_branches(cfg: dict[str, Any]) -> list[str]:
 
 
 def expected_gnn_branches(cfg: dict[str, Any]) -> list[str]:
-    """The 60 GNN branch names: 4 derived point + 8 x (point + 3 raw + 3 cal)."""
+    """GNN branch names.
+
+    ``p4`` (60): 4 derived point + 8 x (point + 3 raw + 3 cal).
+    ``hl`` (28): 4 regressed observables x (point + 3 raw + 3 cal).
+    """
+    if target_set(cfg) == "hl":
+        names = []
+        for t in target_list(cfg):
+            names.append(f"{t['branch_prefix']}_gnn_point")
+            for q in QUANTILE_HEADS:
+                names.append(f"{t['branch_prefix']}_gnn_{q}_raw")
+                names.append(f"{t['branch_prefix']}_gnn_{q}_cal")
+        return names
     names = [f"{t['branch_prefix']}_gnn_point" for t in target_list(cfg)]
     for key in P4_TARGET_KEYS:
         names.append(f"{key}_gnn_point")
@@ -578,14 +627,27 @@ def build_gnn_branches(
     pred_raw: dict,
     pred_cal: dict | None,
     targets: list[dict[str, str]],
+    target_set: str = "p4",
 ) -> dict[str, np.ndarray]:
-    """Turn the ensemble's prediction dicts into the 60 GNN branches.
+    """Turn the ensemble's prediction dicts into the GNN branches (60 p4 / 28 hl).
 
     ``pred_raw`` is ``out["pred_phys"]``; ``pred_cal`` is
     ``out["pred_phys_cal"]`` or ``None`` when calibration is off, in which case
     the ``_cal`` branches are copies of the ``_raw`` ones.
     """
     gnn: dict[str, np.ndarray] = {}
+
+    if target_set == "hl":
+        # Regressed observables: point + raw quantiles + calibrated quantiles.
+        for spec in targets:
+            key, prefix = spec["vbfnet_key"], spec["branch_prefix"]
+            gnn[f"{prefix}_gnn_point"] = _require(pred_raw, key, "point")
+            for q in QUANTILE_HEADS:
+                raw = _require(pred_raw, key, q)
+                gnn[f"{prefix}_gnn_{q}_raw"] = raw
+                gnn[f"{prefix}_gnn_{q}_cal"] = (_require(pred_cal, key, q)
+                                                if pred_cal is not None else raw.copy())
+        return gnn
 
     # Derived observables: point head only.
     derived = derive_observables_from_p4(pred_raw, "point")
@@ -613,6 +675,7 @@ def predict_gnn_for_file(
     targets: list[dict[str, str]],
     acceptance: dict | None = None,
     branch_map: dict[str, str] | None = None,
+    target_set: str = "p4",
 ) -> tuple[dict[str, np.ndarray], np.ndarray, dict[str, np.ndarray]]:
     """Run the fold-routed predictor on one file.
 
@@ -642,10 +705,11 @@ def predict_gnn_for_file(
             "The predictor did not return event_index; rows cannot be matched "
             "to the old selection safely."
         )
-    if not all(k in out["pred_phys"] for k in P4_TARGET_KEYS):
-        raise RuntimeError(f"Expected the 8 p4 targets {P4_TARGET_KEYS}; got {sorted(out['pred_phys'])}")
+    need = [t["vbfnet_key"] for t in targets] if target_set == "hl" else list(P4_TARGET_KEYS)
+    if not all(k in out["pred_phys"] for k in need):
+        raise RuntimeError(f"target_set={target_set} needs targets {need}; got {sorted(out['pred_phys'])}")
 
-    gnn = build_gnn_branches(out["pred_phys"], out.get("pred_phys_cal"), targets)
+    gnn = build_gnn_branches(out["pred_phys"], out.get("pred_phys_cal"), targets, target_set)
     raw_idx = np.asarray(out["event_index"], dtype=np.int64)
     ids = {
         "run": np.asarray(out["run"], dtype=np.int64),
@@ -734,7 +798,7 @@ def process_file(net, path: str, label: int, cap: int | None, cfg: dict, targets
     gnn, raw_idx, ids = predict_gnn_for_file(
         net, path, inputs["tree_name"], cap,
         int(runtime["batch_size"]), int(runtime["num_workers"]), targets,
-        acceptance=cfg.get("acceptance"),
+        acceptance=cfg.get("acceptance"), target_set=target_set(cfg),
         branch_map=branch_map,
     )
     old = compute_old_selection_for_file(
@@ -849,6 +913,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"background  : {background}   (max_events={bkg_cap})")
     print(f"outdir      : {outdir}")
     print(f"old cuts    : |deta| > {old_cfg['deta_cut']}, mjj > {old_cfg['mjj_cut']} GeV")
+    print(f"target_set  : {target_set(cfg)}")
     print(f"calibration : {'ON' if use_cal else 'OFF (the *_cal branches will equal *_raw)'}")
     print(f"acceptance  : {cfg.get('acceptance')}")
     print(f"branch map  : {len(renamed)} renamed branch(es)" + (f" {renamed}" if renamed else ""))
@@ -863,6 +928,15 @@ def main(argv: list[str] | None = None) -> int:
         use_quantile_calibration=use_cal,
         calibration_dir=model_cfg.get("calibration_dir"),
     )
+    # Fail before reading any ROOT file if the release does not regress what
+    # this config expects (e.g. an HL config pointed at the p4 release).
+    need = required_member_keys(cfg, targets)
+    missing = [k for k in need if k not in list(net.target_keys)]
+    if missing:
+        raise SystemExit(
+            f"model.target_set={target_set(cfg)} needs member targets {need}, but the "
+            f"release regresses {list(net.target_keys)} (missing {missing})."
+        )
 
     sig_tree = process_file(net, signal, 1, sig_cap, cfg, targets, branch_map=branch_map)
     bkg_tree = process_file(net, background, 0, bkg_cap, cfg, targets, branch_map=branch_map)
@@ -896,6 +970,8 @@ def main(argv: list[str] | None = None) -> int:
             for m in net.member_meta
         ],
         "route": f"member = {net.route}",
+        "target_set": target_set(cfg),
+        "member_target_keys": list(net.target_keys),
         "member_split_modes": ((net.manifest or {}).get("routing", {}) or {}).get("member_split_modes"),
         "acceptance": cfg.get("acceptance"),
         "branch_map_renamed": renamed,

@@ -1,4 +1,4 @@
-models/*.pt filter=lfs diff=lfs merge=lfs -text
+ensembles/*/models/*.pt filter=lfs diff=lfs merge=lfs -text
 
 # Normalise line endings for text files.
 * text=auto eol=lf

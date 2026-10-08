@@ -35,7 +35,7 @@ reports/
 eval_out/
 bdt_inputs*/
 
-# Checkpoints are shipped via git-lfs from models/ ONLY.
+# Checkpoints are shipped via git-lfs from ensembles/<set>/models/ ONLY.
 # The blanket ignore protects against a stray checkpoint elsewhere in the tree;
 # the negation keeps the release itself tracked. Without the negation this rule
 # would silently exclude the very weights this package exists to distribute.
@@ -43,7 +43,7 @@ bdt_inputs*/
 *.pth
 *.ckpt
 *.onnx
-!models/*.pt
+!ensembles/*/models/*.pt
 
 # Set-aside directories left by the maintainer's release tools (--force)
 models.bak.*/
