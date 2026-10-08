@@ -6,9 +6,9 @@
   },
   "builder": {
     "builder_version": "2.0.0",
-    "git_commit": "unknown",
+    "git_commit": "2ca0aba-dirty",
     "numpy": "2.2.6",
-    "package_version": "4.0.0+hl",
+    "package_version": "5.0.0",
     "python": "3.13.11",
     "script": "maintainer/build_release.py",
     "source_repo_git_commit": "unknown",
@@ -127,28 +127,6 @@
     "order": "calibrate the routed member with its own tables",
     "shipped": true,
     "type": "local_q50_binned_shift"
-  },
-  "files": {
-    "MODEL_CARD.md": "ac60b7f612703d5425488665e205a7e20c596b2f27a197e5fd948792bd787b55",
-    "README.md": "0e2c7316cfe2e91445b1eccb43f91ff8d30af2690e583ae10b309361f60cc307",
-    "example_bdt_input/README.md": "10e8a35a053f3f0fc23c18d568c1e8170270c1feecb2fb6ed65ef6e56119801a",
-    "example_bdt_input/bdt_inputs_config.yaml": "7606525d27a291bb940df9d80f73bff0114f32ae870a51302a696b6c489fe2a6",
-    "example_bdt_input/make_bdt_inputs.py": "3c3090f4f47fdf91e80351ebd3558cae28f566dd11677cc8420203e6a0192917",
-    "scripts/check_branch_map.py": "10106640dd60c2f8b953b45d5e907894616c15e225c7e28ee8e95fc4a8323ced",
-    "scripts/run_infer_ensemble.py": "156f1ad076b76e04a525787f1dcd13597cbbc33edba0138f97eee74fc338768c",
-    "scripts/verify_release.py": "14adeeb07b31b702ba1edb53fe2d23384767d7235db70a4634ef1e3ffbd2a788",
-    "vbfnet_ensemble/__init__.py": "116daf1d228ad2e30d96ffd129790cdee632df90709d65a5a1e6921c97aea8e8",
-    "vbfnet_ensemble/branch_map.py": "5be56f24eb9c6a4c41e639cadfc87660b75ed31a5001d366d5cc6dad844801d6",
-    "vbfnet_ensemble/calibration.py": "91590c20c8747cb040cc97f1fe57d166c75e221f8141f80898906887648fa0ce",
-    "vbfnet_ensemble/manifest.py": "a27be4572c59bb2f98eaabb83c116ed7c5d4ad5991375311cf52ae1071d69fa2",
-    "vbfnet_ensemble/predictor.py": "55b42e6900c418afe3e1cb2b6e82e9dac86b8eb7b921d77d690dc4018421d654",
-    "vbfnet_ensemble/pyg_vbf_dataset.py": "9ade8f9c4bfea5094bb4cac08876a4c35ea23886675cce42197274fdd2022bbb",
-    "vbfnet_ensemble/pyg_vbf_gnn.py": "f5450e1210c7f5e0dab1aa50ee65b07a83779dee9568088157774888f6128d93",
-    "vbfnet_ensemble/routing.py": "3b75dbb179a74a91085ab26026640f57f6add98521ddceb8b7cf6071966a475b",
-    "vbfnet_ensemble/transforms.py": "5000a499037153950d7f5198df68426c521550a1f29fe76e8461449c99e522a5",
-    "vbfnet_ensemble/validate.py": "36e8ce02e5bf7ba095eebdb80153ff935f69138a9bac4f37840c5b3b4eb4ac5c",
-    "vbfnet_ensemble/vbf_config.py": "e5ceba9551558ba3b6a725038188ab4c8154d46eea4882a7aca59bed8037870d",
-    "vbfnet_ensemble/vbf_kfold.py": "1b38eb0f29ed9f65a0780dfc0ab86026d7d43097c9007bd70719cf0463ef65b0"
   },
   "members": [
     {
@@ -278,9 +256,10 @@
     }
   ],
   "release": {
-    "created": "2026-10-06T14:39:11+02:00",
+    "created": "2026-10-08T11:40:19+02:00",
+    "ensemble": "hl",
     "name": "VBFNet_Ensemble",
-    "version": "4.0.0+hl"
+    "version": "5.0.0"
   },
   "routing": {
     "member_split_modes": {

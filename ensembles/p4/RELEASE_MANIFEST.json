@@ -6,9 +6,9 @@
   },
   "builder": {
     "builder_version": "2.0.0",
-    "git_commit": "unknown",
+    "git_commit": "2ca0aba-dirty",
     "numpy": "2.2.6",
-    "package_version": "4.0.0",
+    "package_version": "5.0.0",
     "python": "3.13.11",
     "script": "maintainer/build_release.py",
     "source_repo_git_commit": "unknown",
@@ -168,28 +168,6 @@
     "shipped": true,
     "type": "local_q50_binned_shift"
   },
-  "files": {
-    "MODEL_CARD.md": "35854d6f0122df0fc6e1964667b6fb7f1fefa02d1724be6943130133e0de8cfc",
-    "README.md": "94510da29dc6cea15e4f7f08bb0bd7afde62aeabcaeff78f08329b05194c371d",
-    "example_bdt_input/README.md": "c7b27a27f52097f4323d8dacb0e6c8bf9e3c11c2005057d568b3352af72b8dd4",
-    "example_bdt_input/bdt_inputs_config.yaml": "001005396cd79fc4c7659eaa54a32ce9f0c5cb8c7b448db8004abe0482e59d95",
-    "example_bdt_input/make_bdt_inputs.py": "4eba42846c6c52c95f292ee4a7be3b276cb60f0b80374cc59194f5b65ae36305",
-    "scripts/check_branch_map.py": "10106640dd60c2f8b953b45d5e907894616c15e225c7e28ee8e95fc4a8323ced",
-    "scripts/run_infer_ensemble.py": "156f1ad076b76e04a525787f1dcd13597cbbc33edba0138f97eee74fc338768c",
-    "scripts/verify_release.py": "14adeeb07b31b702ba1edb53fe2d23384767d7235db70a4634ef1e3ffbd2a788",
-    "vbfnet_ensemble/__init__.py": "4a3efcb70d4901466b0a0117fbadb9239f29c4cf079dc226ca13e0531ef3de5e",
-    "vbfnet_ensemble/branch_map.py": "5be56f24eb9c6a4c41e639cadfc87660b75ed31a5001d366d5cc6dad844801d6",
-    "vbfnet_ensemble/calibration.py": "91590c20c8747cb040cc97f1fe57d166c75e221f8141f80898906887648fa0ce",
-    "vbfnet_ensemble/manifest.py": "a27be4572c59bb2f98eaabb83c116ed7c5d4ad5991375311cf52ae1071d69fa2",
-    "vbfnet_ensemble/predictor.py": "55b42e6900c418afe3e1cb2b6e82e9dac86b8eb7b921d77d690dc4018421d654",
-    "vbfnet_ensemble/pyg_vbf_dataset.py": "9ade8f9c4bfea5094bb4cac08876a4c35ea23886675cce42197274fdd2022bbb",
-    "vbfnet_ensemble/pyg_vbf_gnn.py": "f5450e1210c7f5e0dab1aa50ee65b07a83779dee9568088157774888f6128d93",
-    "vbfnet_ensemble/routing.py": "3b75dbb179a74a91085ab26026640f57f6add98521ddceb8b7cf6071966a475b",
-    "vbfnet_ensemble/transforms.py": "5000a499037153950d7f5198df68426c521550a1f29fe76e8461449c99e522a5",
-    "vbfnet_ensemble/validate.py": "36e8ce02e5bf7ba095eebdb80153ff935f69138a9bac4f37840c5b3b4eb4ac5c",
-    "vbfnet_ensemble/vbf_config.py": "3a8bbc60d36860f454ca46c77dc498c4fac059a557819ce6174380f51ae29246",
-    "vbfnet_ensemble/vbf_kfold.py": "1b38eb0f29ed9f65a0780dfc0ab86026d7d43097c9007bd70719cf0463ef65b0"
-  },
   "members": [
     {
       "architecture_fingerprint": "4aa14d4b57314f2f4b7b2d8043075a7e88857210a04d57f7fb4c46488e5399ed",
@@ -318,9 +296,10 @@
     }
   ],
   "release": {
-    "created": "2026-10-06T12:40:15+02:00",
+    "created": "2026-10-08T11:39:51+02:00",
+    "ensemble": "p4",
     "name": "VBFNet_Ensemble",
-    "version": "4.0.0"
+    "version": "5.0.0"
   },
   "routing": {
     "member_split_modes": {

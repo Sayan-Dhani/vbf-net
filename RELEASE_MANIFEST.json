@@ -1,0 +1,73 @@
+{
+  "builder": {
+    "builder_version": "2.0.0",
+    "git_commit": "2ca0aba-dirty",
+    "package_version": "5.0.0",
+    "script": "maintainer/build_release.py"
+  },
+  "ensembles": {
+    "hl": {
+      "calibration_shipped": true,
+      "config_hash": "9415f101ac7df702",
+      "dir": "ensembles/hl",
+      "manifest": "ensembles/hl/RELEASE_MANIFEST.json",
+      "manifest_sha256": "7aba4a532ef0cf097e4239868a725df87d6f5a53c6ebb02339508d93962da8cb",
+      "n_members": 5,
+      "routing": "event % 5",
+      "target_keys": [
+        "mjj",
+        "deta",
+        "eta_prod",
+        "ptsum"
+      ]
+    },
+    "p4": {
+      "calibration_shipped": true,
+      "config_hash": "3fef998e66c87985",
+      "dir": "ensembles/p4",
+      "manifest": "ensembles/p4/RELEASE_MANIFEST.json",
+      "manifest_sha256": "64790a4e5afe12c4f9cdc3e9f3de343f4505aae1932de1b3652d434bda1be2b6",
+      "n_members": 5,
+      "routing": "event % 5",
+      "target_keys": [
+        "q1_E",
+        "q1_px",
+        "q1_py",
+        "q1_pz",
+        "q2_E",
+        "q2_px",
+        "q2_py",
+        "q2_pz"
+      ]
+    }
+  },
+  "files": {
+    "MODEL_CARD.md": "b6070339d25a192b179c665d9ef963b8ae2878acb6fe47770c8e82679de681b3",
+    "README.md": "4bb5e81e997e3ff455f40cd079581edf5a8eea9f34809d2797b558ac09bae219",
+    "example_bdt_input/README.md": "fce6ef759b372603b64873fe0a61e7e3552d24a665e061e8c306424c53a48420",
+    "example_bdt_input/bdt_inputs_config.yaml": "40ffb14143e5a92f27c12544454ca3955913b61f41c474a7bddd8460025b3cb1",
+    "example_bdt_input/make_bdt_inputs.py": "d721fe8b5c81567d0d223b7a716fd4b621d3a6febee9e09f7b1a737870847ec4",
+    "scripts/check_branch_map.py": "10106640dd60c2f8b953b45d5e907894616c15e225c7e28ee8e95fc4a8323ced",
+    "scripts/run_infer_ensemble.py": "04c886c6681f6ad12b447a9f50d216bc34c843150fcb5ce14bd2f8c0a932aa3d",
+    "scripts/verify_release.py": "96b04a68b42649c4d7aab43ba4fd2e58b9d023a603cf5157c7c56b14613bbf99",
+    "vbfnet_ensemble/__init__.py": "f06460013045fed1c7d92907e2e267fe8135893ad71a2b51e35775e989ae0174",
+    "vbfnet_ensemble/branch_map.py": "5be56f24eb9c6a4c41e639cadfc87660b75ed31a5001d366d5cc6dad844801d6",
+    "vbfnet_ensemble/calibration.py": "91590c20c8747cb040cc97f1fe57d166c75e221f8141f80898906887648fa0ce",
+    "vbfnet_ensemble/manifest.py": "84e77cd82645e9d419656e4905597adc776b684e9a67f01292af259b422c43e9",
+    "vbfnet_ensemble/predictor.py": "fa577178fe90309142307da1688fc79d2e3b6c791dfe4451976866224c4ec9c4",
+    "vbfnet_ensemble/pyg_vbf_dataset.py": "9ade8f9c4bfea5094bb4cac08876a4c35ea23886675cce42197274fdd2022bbb",
+    "vbfnet_ensemble/pyg_vbf_gnn.py": "f5450e1210c7f5e0dab1aa50ee65b07a83779dee9568088157774888f6128d93",
+    "vbfnet_ensemble/routing.py": "3b75dbb179a74a91085ab26026640f57f6add98521ddceb8b7cf6071966a475b",
+    "vbfnet_ensemble/transforms.py": "0af5d561ae6904f68fb00e631a2de1518f595d6e3b08fa13129716f08685961f",
+    "vbfnet_ensemble/unified.py": "dd5982140af5f920ca3b93de7aaa7e2c38bc370b9d3340de11c562831bbf0e35",
+    "vbfnet_ensemble/validate.py": "36e8ce02e5bf7ba095eebdb80153ff935f69138a9bac4f37840c5b3b4eb4ac5c",
+    "vbfnet_ensemble/vbf_config.py": "e5ceba9551558ba3b6a725038188ab4c8154d46eea4882a7aca59bed8037870d",
+    "vbfnet_ensemble/vbf_kfold.py": "1b38eb0f29ed9f65a0780dfc0ab86026d7d43097c9007bd70719cf0463ef65b0"
+  },
+  "release": {
+    "created": "2026-10-08T12:02:03+02:00",
+    "name": "VBFNet_Ensemble",
+    "version": "5.0.0"
+  },
+  "schema_version": 2
+}

@@ -1,24 +1,40 @@
-# VBF-Net — VBF-quark four-vector regression for HH→bbττ
+# VBF-Net — VBF-quark regression for HH→bbττ
 
-VBF-Net is a graph neural network that regressed the **four-vectors of
-the two VBF quarks** in HH→bbττ VBF events from reconstructed jets, the H→bb and H→ττ
-candidates and MET.
+VBF-Net is a graph neural network that regresses the **two VBF quarks** of HH→bbττ VBF
+events from reconstructed jets, the H→bb and H→ττ candidates and MET. Two model sets ship
+in this package. You ask for targets by name, and the set that regresses them is loaded
+for you.
 
-For each event it predicts 8 targets, `q{1,2}_{E,px,py,pz}` in GeV, where **q1 is the quark
-with the larger (+ve) η**. Each target has a point estimate plus the 16 / 50 / 84 % quantiles.
-VBF observables (m_jj, Δη, η₁·η₂, pT sum, and the quarks' pT, η, φ, mass) are derived from
-the predicted four-vectors.
+| target | quantity | unit | model set |
+|---|---|---|---|
+| `q1_E`, `q1_px`, `q1_py`, `q1_pz` | four-vector of q1, the quark with the larger (+ve) η | GeV | `p4` |
+| `q2_E`, `q2_px`, `q2_py`, `q2_pz` | four-vector of q2 | GeV | `p4` |
+| `mjj` | m_qq, invariant mass of the two quarks | GeV | `hl` |
+| `deta` | \|Δη_qq\| | — | `hl` |
+| `eta_prod` | η_q1 · η_q2 | — | `hl` |
+| `ptsum` | pT_q1 + pT_q2 | GeV | `hl` |
+
+Each target has a point estimate plus the 16 / 50 / 84 % quantiles. The `hl` quantiles are
+**quantiles of the observable itself**, so `[q16, q84]` is a per-event 68 % interval for
+m_qq, |Δη|, η₁·η₂ and the pT sum.
+
+The `p4` set also gives observables **derived** from its predicted four-vectors:
+`q{1,2}_{pt,eta,phi,mass}` and `mjj_p4`, `deta_p4`, `eta_prod_p4`, `ptsum_p4`.
+
+**Name rule.** A plain name always means the set that regresses it: `mjj` is the `hl`
+prediction, and the m_qq computed from the `p4` four-vectors is `mjj_p4`. A key never
+changes meaning with which sets are loaded.
 
 | | |
 |---|---|
-| Model | 5 k-fold members; each event is predicted by exactly one of them |
-| Calibration | per-member quantile calibration included (optional) |
+| Models | 2 sets × 5 k-fold members; each event is predicted by exactly one member of each set |
+| Calibration | per-member quantile calibration for both sets included (optional) |
 | Details | [MODEL_CARD.md](MODEL_CARD.md): training data, performance, validity domain |
 
 ## Install
 
-The member checkpoints in `models/` are stored with **git-lfs**. Without it, a clone
-contains small pointer files instead of the weights.
+The member checkpoints in `ensembles/<set>/models/` are stored with **git-lfs**. Without
+it, a clone contains small pointer files instead of the weights.
 
 ```bash
 git lfs install
@@ -33,43 +49,70 @@ python scripts/verify_release.py --strict
 - **For calibration:** correctionlib, installed by the `[calibration]` extra.
 - **For the BDT example only:** PyROOT.
 
-**What `verify_release.py --strict` checks:** every checkpoint, calibration file and
-source file against `RELEASE_MANIFEST.json`, and that every checkpoint loads. It reports
-an un-fetched git-lfs pointer; run `git lfs pull` to fix that.
+**What `verify_release.py --strict` checks:** every source file against
+`RELEASE_MANIFEST.json`, each set's manifest, and through it every checkpoint and
+calibration file of that set; then it loads every checkpoint. It reports an un-fetched
+git-lfs pointer; run `git lfs pull` to fix that.
 
 ## Quickstart
 
 ```python
-from vbfnet_ensemble import VBFNet  # alias of VBFNetEnsemble
+from vbfnet_ensemble import VBFNet
 
-net = VBFNet(use_quantile_calibration=True)  # loads and verifies the 5 bundled members
+net = VBFNet(use_quantile_calibration=True)  # every set: p4 + hl, 10 verified members
 out = net.predict_root("signal.root", tree_name="Events", max_events=100)
 
-out["pred_phys"]["q1_E"]["point"]  # central value per event (GeV)
-out["pred_phys_cal"]["q1_E"]["q84"]  # calibrated 84 % quantile
-out["pred_phys"]["mjj"]["point"]  # derived from the predicted four-vectors
-out["fold_id"]  # which member predicted each row (= event % 5)
+out["pred_phys"]["q1_E"]["point"]  # p4: central value per event (GeV)
+out["pred_phys_cal"]["q1_E"]["q84"]  # p4: calibrated 84 % quantile
+out["pred_phys_cal"]["mjj"]["q84"]  # hl: calibrated 84 % quantile of m_qq
+out["pred_phys"]["mjj_p4"]["point"]  # m_qq derived from the p4 four-vectors
+out["ensemble_of"]["mjj"]  # "hl": which set produced a key
+out["fold_id"]  # which member predicted each row (= event % 5, in both sets)
 out["run"], out["lumi"], out["event"]  # CMS event id of each row
 out["event_index"]  # ROOT entry of each row (single file)
 ```
+
+### Choosing the targets
+
+```python
+VBFNet(targets=["q1_E", "q2_pz"])  # loads p4 only
+VBFNet(targets=["mjj", "deta"])  # loads hl only
+VBFNet(targets=["q1_E", "mjj"])  # loads both
+VBFNet(targets="hl")  # a whole set, by name
+VBFNet()  # the same as targets="all": every set
+```
+
+`targets` decides which sets load. Every target of a loaded set is returned, because a
+set's network predicts all of its targets at once. A name that no set provides raises an
+error listing the valid ones. `net.target_keys` lists what you get, in the order of the
+`*_full` arrays: the p4 targets first (positions 0–7, as in v1.0.0), then the hl ones.
+
+With both sets loaded, the event graphs are **built once**, and each event goes through
+one member of each set, i.e. two forward passes.
 
 `scripts/run_infer_ensemble.py` is a runnable version:
 
 ```bash
 python3 scripts/run_infer_ensemble.py --root_file /path/to/signal.root --max_events 500 --calibrate
+python3 scripts/run_infer_ensemble.py --root_file /path/to/signal.root --targets q1_E mjj
 ```
+
+`VBFNetEnsemble(ensemble="p4")` or `VBFNetEnsemble(ensemble="hl")` runs a single set, with
+the same methods. It is the engine behind `VBFNet`; use it for your own checkpoints
+(`checkpoint=`, `calibration_dir=`).
 
 ### Input files
 
 - **Tree:** a TTree (default `Events`) with the VBF-jet, H→bb, H→ττ and MET branches the
-  model reads. [`branch_map.yaml`](branch_map.yaml) lists all of them.
+  models read. [`branch_map.yaml`](branch_map.yaml) lists all of them. Both sets read the
+  same branches.
 - **Event id:** the branches `run`, `luminosityBlock` and `event` are required, because
   routing uses `event`. A file without them is refused.
 - **Different branch names:** use a branch map, see below.
 
 ### Files with different branch names
 
-[`branch_map.yaml`](branch_map.yaml) maps each branch the model expects (left) to the
+[`branch_map.yaml`](branch_map.yaml) maps each branch the models expect (left) to the
 branch in your tree that holds the same quantity (right). The shipped file is the identity
 map, i.e. the names of the training files. If your names differ:
 
@@ -163,24 +206,25 @@ with the true quarks on simulation; never read otherwise)
 | branch | per | type | meaning |
 |---|---|---|---|
 | `nLHEPart` | event | integer | number of LHE particles; the training selection requires exactly 6 |
-| `LHEPart_pt`, `LHEPart_eta`, `LHEPart_phi`, `LHEPart_mass` | LHE particle | float | LHE particle four-momenta. The two VBF quarks are entries 4 and 5 (0-based); q1 is the one with the larger η. |
+| `LHEPart_pt`, `LHEPart_eta`, `LHEPart_phi`, `LHEPart_mass` | LHE particle | float | LHE particle four-momenta. The two VBF quarks are entries 4 and 5 (0-based); q1 is the one with the larger η. All twelve targets are computed from these two quarks. |
 | `Hbb_isValid` | event | bool | the event has a valid H→bb candidate; part of the training selection |
 
 ## How an event is predicted
 
 ```
-event ──► acceptance gate (reco only) ──► k = event % 5 ──► member k ──► prediction
+event ──► acceptance gate (reco only) ──► k = event % 5 ──► member k of each loaded set ──► prediction
 ```
 
 | step | what happens |
 |---|---|
 | acceptance gate | The event needs ≥ 2 VBF jets with pT ≥ 50 GeV and \|η\| ≤ 4.7. This decides which events get a prediction; the graph is still built from **all** of the event's jets. No generator-level information is used. |
 | routing | `k = event % 5`, from the CMS `event` branch (`vbfnet_ensemble/vbf_kfold.py`) |
-| prediction | member k alone. With calibration on, member k's own tables are used. |
+| prediction | member k of each set alone. With calibration on, member k's own tables are used. |
 
 **Why one member per event, not an average.** The training split put every event with
 `event % 5 == k` in member k's validation set, so member k is the one model that **never
-trained on it**. Routing therefore has three consequences:
+trained on it**. Both sets were trained with this same split. Routing therefore has three
+consequences:
 
 - **Signal training samples get honest predictions.** On those events the prediction is
   the out-of-fold prediction that was measured after training.
@@ -204,16 +248,23 @@ graphs carry `data.event`.
 
 ### Returned keys
 
+T is the number of targets of the loaded sets (`len(net.target_keys)`: 12 with both, 8 for
+p4 alone, 4 for hl alone).
+
 | key | shape | meaning |
 |---|---|---|
-| `pred_log_full` / `pred_phys_full` | (N, 8, 4) | model-space / physical predictions; axis 1 = `net.target_keys`, axis 2 = `["q16","q50","q84","point"]` |
-| `pred_phys` | dict | `[target][head]` arrays, plus derived `mjj`, `deta`, `eta_prod`, `ptsum`, `q{1,2}_{pt,eta,phi,mass}` |
+| `pred_log_full` / `pred_phys_full` | (N, T, 4) | model-space / physical predictions; axis 1 = `net.target_keys`, axis 2 = `["q16","q50","q84","point"]` |
+| `pred_phys` | dict | `[target][head]` arrays for every target of the loaded sets, plus the p4-derived `q{1,2}_{pt,eta,phi,mass}` and `{mjj,deta,eta_prod,ptsum}_p4` |
 | `pred_*_cal*` | | the calibrated versions (calibration on) |
-| `fold_id` | (N,) | the member that predicted the row |
+| `ensemble_of` | dict | the set that produced each key, e.g. `{"mjj": "hl", "q1_E": "p4", "mjj_p4": "p4", …}` |
+| `ensembles`, `target_keys` | list | the loaded sets and their targets, in array order |
+| `fold_id` | (N,) | the member that predicted the row (the same index in every set) |
 | `run`, `lumi`, `event` | (N,) | CMS event id |
 | `event_index` | (N,) | ROOT entry of the row |
 | `route`, `acceptance` | | `"event % 5"` and the gate that was applied |
-| `pred_log_members` | (5, N, 8, 4) | only with `return_members=True` (diagnostic: every member on every event) |
+| `quantile_crossing_rate` | float | fraction of (event, target) pairs whose raw quantiles crossed before sorting; `…_by_set` per set |
+| `truth_log` | (N, T) | only with `require_truth=True` |
+| `pred_log_members` | (5, N, T, 4) | only with `return_members=True` (diagnostic: every member on every event) |
 
 Events failing the gate get no row. **Match rows to input events with `event_index` or
 the event id, never by position.** MC event numbers can repeat across samples, so a join
@@ -228,8 +279,8 @@ Per target and event you get:
   `q84` in 84 %.
 
 ```python
-q = out["pred_phys_cal"]["q1_E"]
-sigma = 0.5 * (q["q84"] - q["q16"])  # symmetric ~1 sigma
+q = out["pred_phys_cal"]["mjj"]
+sigma = 0.5 * (q["q84"] - q["q16"])  # symmetric ~1 sigma of m_qq
 err_down = q["q50"] - q["q16"]
 err_up = q["q84"] - q["q50"]
 ```
@@ -238,42 +289,79 @@ err_up = q["q84"] - q["q50"]
 - Use the calibrated keys whenever you use quantiles.
 - The `point` head is never calibrated, so it is identical in `pred_phys` and
   `pred_phys_cal`.
-- The `q16`/`q84` entries of the **derived** observables (`mjj`, …) are computed from the
-  component quantiles. They are not quantiles of the observable, so never quote them as
-  uncertainties.
+- The quantiles of the regressed targets (`q1_E` …, `mjj` …) are quantiles of that target.
+  For m_qq, |Δη|, η₁·η₂ and the pT sum use the hl keys (`mjj`, `deta`, `eta_prod`,
+  `ptsum`) when you need an uncertainty.
+- The `q16`/`q84` entries of the **derived** observables (`mjj_p4`, `q1_pt`, …) are
+  computed from the component quantiles. They are not quantiles of the observable, so
+  never quote them as uncertainties.
 
 ## Quantile calibration
 
 Calibration is **off** by default. Switch it on at construction
 (`use_quantile_calibration=True`), at any time (`net.use_quantile_calibration = False`), or
-per call (`calibrate=True/False`). Turning it on loads and verifies every member's tables
-immediately; it needs `correctionlib`.
+per call (`calibrate=True/False`); the switch acts on every loaded set. Turning it on loads
+and verifies every member's tables immediately; it needs `correctionlib`.
 
 **What it does:**
-- **Correction:** rows routed to member k get member k's own additive shift in GeV,
-  binned in member k's raw q50: `q_cal = q_raw + delta_k(bin of raw q50)`.
+- **Correction:** rows routed to member k get member k's own additive shift, binned in
+  member k's raw q50: `q_cal = q_raw + delta_k(bin of raw q50)`. The shift is in the
+  target's own unit: GeV for the p4 components, `mjj` and `ptsum`, none for `deta` and
+  `eta_prod`.
 - **Afterwards:** the quantiles are re-sorted. The point head is untouched.
 - **Fit:** each member's shifts were fitted on that member's out-of-fold events, i.e.
-  exactly the events routed to it.
+  exactly the events routed to it. Each set has its own tables.
 
-The decision to ship the calibration, and its measured effect, are in
+The decision to ship the calibration, and its measured effect for each set, are in
 [MODEL_CARD.md](MODEL_CARD.md#quantile-calibration).
 
 ## Making BDT inputs
 
 [`example_bdt_input/`](example_bdt_input/README.md) runs the classical VBF jet-pair
-selection and the routed GNN on one signal and one background file, and writes flat TTrees
-with a fixed 79-branch contract.
+selection and the routed GNN on one signal and one background file, and writes flat
+TTrees with a fixed branch contract: 107 branches with both sets (the shipped config), 79
+with `--target_set p4`, 47 with `--target_set hl`. As in the Python API,
+`mjj_gnn_point` is the hl set's regressed value and `mjj_gnn_p4_point` the p4-derived one.
 
 ```bash
 python3 example_bdt_input/make_bdt_inputs.py --config example_bdt_input/bdt_inputs_config.yaml \
     --signal /path/to/signal.root --background /path/to/background.root \
-    [--branch_map my_branch_map.yaml]
+    [--branch_map my_branch_map.yaml] [--target_set p4|hl|both]
 ```
+
+## Migrating from v1.0.0 or hl-v1.0.0
+
+The weights and calibrations of both sets are unchanged, and so are the predicted values:
+on 2,000 signal and 2,000 DY events (CPU), every target, head and calibrated value is
+bit-identical to v1.0.0 and hl-v1.0.0. What changed:
+
+- **One install for both models.** The two releases installed the same package name, so
+  using both needed two environments. Now one checkout serves both.
+- **`VBFNet` loads targets, not one model.** `VBFNet()` loads both sets. To load only the
+  v1.0.0 set use `VBFNet(targets="p4")`; only the hl-v1.0.0 set, `VBFNet(targets="hl")`.
+  `VBFNet` no longer takes `checkpoint=` / `calibration_dir=`; use
+  `VBFNetEnsemble(ensemble=..., checkpoint=..., calibration_dir=...)` for those.
+- **p4-derived observables are renamed.** v1.0.0's `pred_phys["mjj"]` (and `deta`,
+  `eta_prod`, `ptsum`) is now `pred_phys["mjj_p4"]` etc.; the plain names are the hl set's
+  regressed values. In BDT inputs, `<obs>_gnn_point` from the p4 set is now
+  `<obs>_gnn_p4_point`.
+- **Array positions.** The p4 targets keep positions 0–7 of the `*_full` arrays; with both
+  sets loaded the hl targets follow at 8–11. With `targets="hl"` they are at 0–3, as in
+  hl-v1.0.0. Index by `net.target_keys` rather than by position.
+- **Layout.** `models/`, `calibrations/` and the set manifest moved to
+  `ensembles/p4/` and `ensembles/hl/`. The top-level `RELEASE_MANIFEST.json` now hashes
+  the code and pins each set's manifest.
+
+## Versions and branches
+
+- **`main`** holds the package. Releases are tags: **v2.0.0** = package 5.0.0, both sets.
+- The earlier single-set releases stay available as tags: **v1.0.0** (p4, package 4.0.0)
+  and **hl-v1.0.0** (hl, package 4.0.0+hl).
+- Other branches are for different training versions of the models.
 
 ## Validity domain
 
-The model was trained only on VBF HH→bbττ signal (Run3_2022EE) with both VBF quarks at
+Both sets were trained only on VBF HH→bbττ signal (Run3_2022EE) with both VBF quarks at
 pT ≥ 50 GeV and |η| < 4.7 and a valid H→bb candidate. The acceptance gate is wider than
 that selection, so some events that get a prediction lie outside the training phase
 space. Read the [validity domain](MODEL_CARD.md#validity-domain) section of the model card
@@ -283,20 +371,24 @@ before using the predictions.
 
 ```
 vbfnet_ensemble/
-  predictor.py        VBFNetEnsemble (alias VBFNet): load, route, calibrate, decode
+  unified.py          VBFNet: targets -> model sets, one shared dataset, merged predictions
+  predictor.py        VBFNetEnsemble: one set; load, route, calibrate, decode
   routing.py          routing rule, acceptance-gate defaults, quantile helpers
   vbf_kfold.py        the split rule used in training (event % K)
   calibration.py      per-member correctionlib shifts
   pyg_vbf_dataset.py  graph builder (inference mode, event ids, gate)
   pyg_vbf_gnn.py, vbf_config.py, transforms.py   model, config, decode
-  validate.py, manifest.py                      member compatibility, release manifest
+  validate.py, manifest.py                      member compatibility, release manifests
   branch_map.py       load / validate / check input branch maps
-models/member_fold{k}.pt     the five members (git-lfs)
-calibrations/fold{k}/        per-member calibration
+ensembles/
+  p4/models/member_fold{k}.pt     the five p4 members (git-lfs)
+  p4/calibrations/fold{k}/        their per-member calibration
+  p4/RELEASE_MANIFEST.json        sha256 of every p4 member and calibration file
+  hl/...                          the same for the hl set
 scripts/                     run_infer_ensemble.py, check_branch_map.py, verify_release.py
 branch_map.yaml              input branch map template (model name -> your branch)
-example_bdt_input/           BDT input production (79-branch contract)
-RELEASE_MANIFEST.json        sha256 of every member, calibration and source file
+example_bdt_input/           BDT input production (107 / 79 / 47-branch contracts)
+RELEASE_MANIFEST.json        sha256 of every source file and of each set's manifest
 ```
 
 ## License
