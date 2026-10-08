@@ -251,14 +251,21 @@ def provenance_text(manifest: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+#: Source directories of the C++ library under ``cpp/`` (its ``build/`` is not shipped).
+CPP_SOURCE_DIRS = ("include", "src", "examples")
+
+
 def iter_code_files(root: str | Path) -> Iterable[Path]:
     """The shipped files whose hashes go into ``manifest["files"]``."""
     root = Path(root)
+    cpp = root / "cpp"
     for rel in sorted(
         [p.relative_to(root) for p in (root / "vbfnet_ensemble").rglob("*.py")]
         + [p.relative_to(root) for p in (root / "scripts").rglob("*.py")]
         + [p.relative_to(root) for p in (root / "example_bdt_input").glob("*")
            if p.suffix in {".py", ".yaml", ".md"}]
+        + [p.relative_to(root) for d in CPP_SOURCE_DIRS for p in (cpp / d).rglob("*") if p.is_file()]
+        + [p.relative_to(root) for p in (cpp / "CMakeLists.txt", cpp / "README.md") if p.is_file()]
     ):
         if "__pycache__" in rel.parts:
             continue

@@ -18,6 +18,11 @@ manifest (``ensembles/<set>/RELEASE_MANIFEST.json``), which hashes that set's
 members and calibration. A set manifest can also be checked on its own with
 ``--manifest``/``--root``.
 
+C++ weight files (``ensembles/<set>/cpp/``, written by
+``scripts/export_cpp_weights.py``) are checked when present: their recorded
+source hashes against the set manifest, and with ``--strict`` byte for byte
+against a fresh export.
+
 Usage
 -----
     python3 scripts/verify_release.py
@@ -67,6 +72,32 @@ def strict_check(manifest: dict, root: Path, label: str) -> list[str]:
     return problems
 
 
+def cpp_exports(root: Path, index: dict, names: list[str], strict: bool) -> list[str]:
+    """Check the C++ weight files (scripts/export_cpp_weights.py) that exist; --strict re-exports."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("export_cpp_weights", REPO_ROOT / "scripts" / "export_cpp_weights.py")
+    exporter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(exporter)
+    problems: list[str] = []
+    for name in names:
+        set_dir = root / index[name]["dir"]
+        path = exporter.default_output(set_dir, name)
+        if not path.exists():
+            print(f"[verify]   [{name}] C++ weights: not exported (only needed for cpp/)")
+            continue
+        found = exporter.check_against_manifest(path, set_dir)
+        if not found and strict:
+            version = exporter.read_export_meta(path)["package_version"][0][0]
+            if exporter.build_export(set_dir, name, version) != path.read_bytes():
+                found = [f"{path.name}: differs from a fresh export of the release"]
+        problems += [f"[{name}] {p}" for p in found]
+        if not found:
+            print(f"[verify]   [{name}] C++ weights: {path.relative_to(root)} matches the release"
+                  + (" (re-exported, byte-identical)" if strict else ""))
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--manifest", default=str(REPO_ROOT / MANIFEST_NAME))
@@ -105,6 +136,8 @@ def main() -> int:
             for name in names:
                 sub_root = root / index[name]["dir"]
                 problems += strict_check(load_manifest(sub_root / MANIFEST_NAME), sub_root, f"[{name}] ")
+        if not problems:
+            problems += cpp_exports(root, index, [n for n in names if n in index], args.strict)
         n_members = sum(int(index[n].get("n_members") or 0) for n in names if n in index)
     else:
         shared = manifest.get("shared", {})

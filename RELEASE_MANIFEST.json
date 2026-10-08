@@ -1,7 +1,7 @@
 {
   "builder": {
     "builder_version": "2.0.0",
-    "git_commit": "2ca0aba-dirty",
+    "git_commit": "d931e8e-dirty",
     "package_version": "5.0.0",
     "script": "maintainer/build_release.py"
   },
@@ -43,17 +43,25 @@
   },
   "files": {
     "MODEL_CARD.md": "b6070339d25a192b179c665d9ef963b8ae2878acb6fe47770c8e82679de681b3",
-    "README.md": "4bb5e81e997e3ff455f40cd079581edf5a8eea9f34809d2797b558ac09bae219",
+    "README.md": "cbfa8dd05664d075835c9d2b280b520f2003fa10918ddb9added8116ec4e5cbd",
+    "cpp/CMakeLists.txt": "7049468b6854f70c2ed35223b408ebf14cb31ca8065017e85dcd9ac9f8dfe26d",
+    "cpp/README.md": "04360fd20ec5280f059f1034a1a4d8dc442381d406d94b536378166839a9c1dc",
+    "cpp/examples/minimal.cc": "23eb67b9c6d16eb1924a014f2488e5cc318f7d10c2a3e866c260fc9e934e3915",
+    "cpp/examples/predict_tree.cc": "96d3b1299082f1846653902f92e8cfc9a5f1f904253a65ec9b0d9ee3698a0b9c",
+    "cpp/include/vbfnet/VBFNet.h": "fd7b405cb74a14373246504bec3245e95eb555c53de3ac067bd8ac6581c79bc5",
+    "cpp/src/VBFNet.cc": "4ec1f384704891cbe9a5f127a18a5df91baaf989521c2f3e46b7032206b7d7eb",
     "example_bdt_input/README.md": "fce6ef759b372603b64873fe0a61e7e3552d24a665e061e8c306424c53a48420",
     "example_bdt_input/bdt_inputs_config.yaml": "40ffb14143e5a92f27c12544454ca3955913b61f41c474a7bddd8460025b3cb1",
     "example_bdt_input/make_bdt_inputs.py": "d721fe8b5c81567d0d223b7a716fd4b621d3a6febee9e09f7b1a737870847ec4",
     "scripts/check_branch_map.py": "10106640dd60c2f8b953b45d5e907894616c15e225c7e28ee8e95fc4a8323ced",
+    "scripts/check_cpp_parity.py": "d15e7c7ea4ad851c1cbcc3247960d2a81bdd0a145950e26e406b7f6e73bf3720",
+    "scripts/export_cpp_weights.py": "c999bf2c70907654b6fa25309e12490674c52e6df3415e54a1bbf261346a3560",
     "scripts/run_infer_ensemble.py": "04c886c6681f6ad12b447a9f50d216bc34c843150fcb5ce14bd2f8c0a932aa3d",
-    "scripts/verify_release.py": "96b04a68b42649c4d7aab43ba4fd2e58b9d023a603cf5157c7c56b14613bbf99",
+    "scripts/verify_release.py": "a510e0787247b995b77b9f441308a5b5547d40953c2fc4b35565a0cbca8b5b72",
     "vbfnet_ensemble/__init__.py": "f06460013045fed1c7d92907e2e267fe8135893ad71a2b51e35775e989ae0174",
     "vbfnet_ensemble/branch_map.py": "5be56f24eb9c6a4c41e639cadfc87660b75ed31a5001d366d5cc6dad844801d6",
     "vbfnet_ensemble/calibration.py": "91590c20c8747cb040cc97f1fe57d166c75e221f8141f80898906887648fa0ce",
-    "vbfnet_ensemble/manifest.py": "84e77cd82645e9d419656e4905597adc776b684e9a67f01292af259b422c43e9",
+    "vbfnet_ensemble/manifest.py": "1be85a8606b93af10249a54e7669e4b298548f1ca70abdb7ed7346c928f5c14a",
     "vbfnet_ensemble/predictor.py": "fa577178fe90309142307da1688fc79d2e3b6c791dfe4451976866224c4ec9c4",
     "vbfnet_ensemble/pyg_vbf_dataset.py": "9ade8f9c4bfea5094bb4cac08876a4c35ea23886675cce42197274fdd2022bbb",
     "vbfnet_ensemble/pyg_vbf_gnn.py": "f5450e1210c7f5e0dab1aa50ee65b07a83779dee9568088157774888f6128d93",
@@ -65,7 +73,7 @@
     "vbfnet_ensemble/vbf_kfold.py": "1b38eb0f29ed9f65a0780dfc0ab86026d7d43097c9007bd70719cf0463ef65b0"
   },
   "release": {
-    "created": "2026-10-08T12:02:03+02:00",
+    "created": "2026-10-08T15:35:09+02:00",
     "name": "VBFNet_Ensemble",
     "version": "5.0.0"
   },
